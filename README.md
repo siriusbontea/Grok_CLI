@@ -1,6 +1,5 @@
 # Grok CLI: A Terminal Interface for Grok AI
-
- █                                                         
+```                               █                                                         
                                 █                                                           
               ████████        ██                                                            
           ███████████████    ██                                                             
@@ -17,7 +16,7 @@
      ██     ███████████████                                                                 
     █        ███████████                                                                    
   █
-
+```
 Grok CLI is a Python-based command-line tool that provides an interactive interface to xAI's Grok AI models (grok-4 and grok-code-fast-1). It allows you to generate code, save files, run scripts, commit to git, and more, all from your terminal. Ideal for coding workflows, project bootstrapping, and quick AI assistance.
 
 ## Features
