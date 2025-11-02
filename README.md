@@ -64,8 +64,10 @@ source ~/.zshrc
 4. Set permissions for project directories (to allow file creation):
 
 ```
-mkdir ~/your_project_dir
-chmod -R 775 ~/your_project_dir  # Owner/group write access
+mkdir ~/your_project
+cd ~/your_project
+chmod -R 775 .  # Owner/group rwx, others rx
+chown -R $USER:$(id -gn) .  # Ensure your user owns it (replace with your group if needed)
 ```
 
 ## Usage
@@ -92,13 +94,14 @@ grok
 - Prompt: "Save markdown? (y/n/[filename])" — Enter y or filename (defaults to .md).
 - Saves to current dir.
 - For Python: Also prompts to run/test/commit.
+- Note: Ensure dir permissions (775) for writes.
 
 ### Troubleshooting
 - **Arrow Keys Not Working**: Ensure `gnureadline` is installed (`pip install gnureadline`). Restart terminal.
-- **Permission Denied**: Check dir permissions (`ls -l`). Use `chmod 775 dir/` for write access. Run as owner (not sudo).
-- **API Errors**: Verify $XAI_KEY with `echo $XAI_KEY`. Regenerate if invalid.
-- **No Code Block Detected**: Ask Grok to use ```language ... ``` format.
-- **Conda Issues**: Activate base env or use system Python.
+- **Permission Denied on Files**: Check ownership (`ls -l`), fix with `chown -R $USER .`. Avoid sudo for CLI.
+- **API Errors**: Check $XAI_KEY with `echo $XAI_KEY`. Regenerate if invalid.
+- **No Code Block Detected**: Prompt Grok to use ```language ... ``` format.
+
 
 For bugs or contributions, open an issue/PR on this repo.
 
