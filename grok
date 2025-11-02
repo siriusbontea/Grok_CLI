@@ -1,0 +1,284 @@
+#!/usr/bin/env python3
+import os
+import re
+import readline  # For arrow key editing
+import subprocess
+from pathlib import Path
+from rich.console import Console
+from rich.markdown import Markdown
+from rich.prompt import Prompt
+from rich.table import Table
+from openai import OpenAI
+
+console = Console()
+client = OpenAI(api_key=os.getenv("XAI_KEY"), base_url="https://api.x.ai/v1")
+
+MODEL = "grok-4"
+HISTORY = [{
+    "role": "system",
+    "content": "You are Grok-4, a powerful coding assistant by xAI. "
+               "CLI mode. Never say Grok-2. Models: grok-4, grok-code-fast-1. "
+               "Commands: init, model, preview, dockerize, review, debug, help. "
+               "When providing content for files, always use a code block with the language (e.g., ```markdown for .md, ```python for .py, ```bash for .sh). Do not simulate commands; use code blocks for direct content."
+}]
+
+TEMPLATES = {
+    "fastapi": {
+        "main.py": '''from fastapi import FastAPI
+app = FastAPI()
+@app.get("/")
+def read_root():
+    return {"Hello": "from Grok CLI"}''',
+        "requirements.txt": "fastapi\nuuvicorn\n"
+    },
+    "flask": {
+        "app.py": '''from flask import Flask
+app = Flask(__name__)
+@app.route("/")
+def home():
+    return "Hello from Grok CLI!"''',
+        "requirements.txt": "flask\n"
+    },
+    "cli": {
+        "main.py": '''import argparse
+parser = argparse.ArgumentParser()
+parser.add_argument("name", nargs="?", default="World")
+args = parser.parse_args()
+print(f"Hello, {args.name}!")''',
+        "requirements.txt": ""
+    }
+}
+
+EXTENSION_MAP = {
+    "python": ".py",
+    "markdown": ".md",
+    "md": ".md",
+    "text": ".txt",
+    "json": ".json",
+    "yaml": ".yaml",
+    "html": ".html",
+    "css": ".css",
+    "js": ".js",
+    "bash": ".sh",
+    "sh": ".sh",
+    "": ".txt"  # Default
+}
+
+def get_python():
+    venv_python = Path(".venv/bin/python")
+    return str(venv_python) if venv_python.exists() else "python3"
+
+def run_command(cmd, bg=False):
+    try:
+        if bg:
+            subprocess.Popen(cmd, shell=True)
+            console.print(f"[green]Started: {cmd}[/]")
+            return True
+        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+        if result.stdout: console.print(f"[dim]{result.stdout}[/]")
+        if result.stderr: console.print(f"[red]{result.stderr}[/]")
+        return result.returncode == 0
+    except Exception as e:
+        console.print(f"[red]Error: {e}[/]")
+        return False
+
+def chat():
+    global MODEL
+
+    # === LIGHT-GREY ASCII LOGO ===
+    logo = """\
+                                  █                                                         
+                                █                                                           
+              ████████        ██                                                            
+          ███████████████    ██                                                             
+        ██████             ████              ██████                             ███         
+       ████              █████            ████████████                          ███         
+      ████             ███████           ███        ███                         ███         
+     ████            ███   ████         ███                ██████   ████████    ███     ███ 
+     ████          ██       ███         ███               ███     ████    ████  ███   ███   
+     ███         ██         ███         ███     ████████  ███     ███      ███  ███  ███    
+     ████                  ████         ███          ███  ███     ███      ███  ████████    
+      ███                  ███           ███        ███   ███     ███      ███  ███   ███   
+      █████              █████            ████████████    ███      ████  ████   ███    ███  
+      ███              █████                 ███████      ███        ██████     ███      ███
+     ██     ███████████████                                                                 
+    █        ███████████                                                                    
+  █                                                                                         
+                                                                                            """
+    console.print(f"[silver]{logo}[/silver]")
+    console.print("[dim]init • model • preview • dockerize • review • debug • help[/]\n")
+
+    while True:
+        try:
+            # Use readline for input with arrow key support
+            readline.set_history_length(1000)
+            user = input("\033[1;36mYou: \033[0m")
+            if user.lower() in {"quit", "exit"}: break
+            if not user.strip(): continue
+
+            # HELP
+            if user.lower() == "help":
+                table = Table(title="Grok CLI Commands")
+                table.add_column("Command", style="cyan")
+                table.add_column("Description")
+                for cmd, desc in [
+                    ("model fast/best", "Switch model"),
+                    ("init [template] [--git --venv]", "Create project (fastapi/flask/cli/custom)"),
+                    ("preview", "Auto-start web server"),
+                    ("dockerize", "Generate Docker + compose"),
+                    ("review", "AI code review"),
+                    ("debug model", "Show model/venv/dir"),
+                    ("help", "This menu")
+                ]:
+                    table.add_row(cmd, desc)
+                console.print(table)
+                continue
+
+            # DEBUG MODEL
+            if user.lower() == "debug model":
+                table = Table(title="Debug Info")
+                table.add_column("Key"); table.add_column("Value")
+                table.add_row("Model", MODEL)
+                table.add_row("Python", get_python())
+                table.add_row("Dir", str(Path.cwd()))
+                table.add_row("Venv", "Yes" if Path(".venv").exists() else "No")
+                table.add_row("Git", "Yes" if Path(".git").exists() else "No")
+                console.print(table)
+                continue
+
+            # INIT PROJECT
+            if user.lower().startswith("init "):
+                parts = user.lower().split()
+                tmpl = parts[1] if len(parts) > 1 else None
+                do_git = "--git" in parts or True
+                do_venv = "--venv" in parts
+
+                if tmpl == "custom":
+                    tmpl_name = parts[2] if len(parts) > 2 else "myproject"
+                    TEMPLATES["custom"] = {
+                        "main.py": f'''# {tmpl_name} - Generated by Grok CLI
+print("Hello from {tmpl_name}!")
+
+# Add your code here
+if __name__ == "__main__":
+    pass''',
+                        "requirements.txt": ""
+                    }
+                    tmpl = "custom"
+                elif tmpl not in TEMPLATES:
+                    console.print(f"[red]Template not found: {tmpl}. Try: fastapi, flask, cli, custom[/]")
+                    continue
+
+                console.print(f"[green]Initializing {tmpl}...[/]")
+                for f, c in TEMPLATES[tmpl].items():
+                    Path(f).write_text(c)
+                    console.print(f"[green]{f}[/]")
+
+                if do_venv:
+                    run_command("python3 -m venv .venv")
+                    console.print("[green]Venv created[/]")
+
+                if Path("requirements.txt").exists():
+                    run_command(f"{get_python()} -m pip install -r requirements.txt")
+
+                if do_git:
+                    run_command("git init && git add . && git commit -m 'Grok: init'")
+                    console.print("[green]Git initialized[/]")
+                continue
+
+            # MODEL SWITCH
+            if user.lower() == "model fast":
+                MODEL = "grok-code-fast-1"
+                console.print("[green]→ grok-code-fast-1[/]"); continue
+            if user.lower() == "model best":
+                MODEL = "grok-4"
+                console.print("[green]→ grok-4[/]"); continue
+
+            # WEB PREVIEW
+            if user.lower() == "preview":
+                if Path("main.py").exists() and "fastapi" in Path("main.py").read_text():
+                    run_command("uvicorn main:app --reload", bg=True)
+                elif Path("app.py").exists() and "flask" in Path("app.py").read_text():
+                    run_command("flask run", bg=True)
+                else:
+                    console.print("[red]No web app detected[/]")
+                continue
+
+            # DOCKERIZE
+            if user.lower() == "dockerize":
+                dockerfile = '''FROM python:3.12-slim
+WORKDIR /app
+COPY . .
+RUN pip install -r requirements.txt
+CMD ["python", "main.py"]
+'''
+                compose = '''version: "3.8"
+services:
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+'''
+                Path("Dockerfile").write_text(dockerfile)
+                Path("docker-compose.yml").write_text(compose)
+                console.print("[green]Dockerfile + docker-compose.yml created[/]")
+                run_command("docker build -t grok-app .")
+                continue
+
+            # AI CODE REVIEW
+            if user.lower() == "review":
+                files = list(Path(".").rglob("*.py"))
+                if not files:
+                    console.print("[red]No .py files found[/]"); continue
+                code = "\n\n".join(f"# {f}\n{f.read_text()}" for f in files)
+                HISTORY.append({"role": "user", "content": f"Review this code for bugs, performance, style:\n\n{code[:30000]}"})
+                with console.status("Reviewing..."):
+                    resp = client.chat.completions.create(model=MODEL, messages=HISTORY, temperature=0.2)
+                review = resp.choices[0].message.content
+                console.print(Markdown(f"## Code Review\n{review}"))
+                HISTORY.append({"role": "assistant", "content": review})
+                continue
+
+            # AI RESPONSE
+            HISTORY.append({"role": "user", "content": user})
+            with console.status("[bold green]Grok thinking..."):
+                resp = client.chat.completions.create(model=MODEL, messages=HISTORY, temperature=0.3, max_tokens=4096)
+            reply = resp.choices[0].message.content
+            console.print(Markdown(reply))
+            HISTORY.append({"role": "assistant", "content": reply})
+
+            # AUTO-SAVE + RUN + TEST + GIT (GENERAL BLOCK DETECTION)
+            code_match = re.search(r"```(\w*)\n(.*?)\n```", reply, re.DOTALL)
+            if code_match:
+                language = code_match.group(1).lower()
+                code = code_match.group(2).strip() + "\n"
+                ext = EXTENSION_MAP.get(language, ".txt")
+                default = f"{Path.cwd().name}_file{ext}"
+                save = Prompt.ask(f"[green]Save {language or 'file'}? (y/n/[filename])[/]", default="y")
+                if save in {"n", "no"}:
+                    continue
+                path = save if save not in {"y", "yes"} else Prompt.ask("Save as", default=default)
+
+                full = Path(path).resolve()
+                full.parent.mkdir(parents=True, exist_ok=True)
+                full.write_text(code)
+                console.print(f"[green]Saved: {full}[/]")
+
+                if full.suffix == ".py" and Prompt.ask("[yellow]Run now?[/]", default="y") == "y":
+                    os.system(f"{get_python()} {full}")
+
+                if (Path("tests").exists() or any(p.name.startswith("test_") for p in Path(".").iterdir())):
+                    if Prompt.ask("[yellow]Run tests?[/]", default="y") == "y":
+                        run_command("pytest -q")
+
+                if Path(".git").exists() and Prompt.ask("[yellow]Git commit?[/]", default="y") == "y":
+                    summary = reply.split("\n")[0][:50]
+                    run_command(f'git add . && git commit -m "Grok: {summary}"')
+
+        except KeyboardInterrupt:
+            break
+        except Exception as e:
+            console.print(f"[red]Error: {e}[/]")
+
+if __name__ == "__main__":
+    chat()
