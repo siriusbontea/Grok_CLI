@@ -14,7 +14,7 @@
     ███                  ███           ███        ███   ███     ███      ███  ███   ███   
     █████              █████            ████████████    ███      ████  ████   ███    ███  
     ███              █████                 ███████      ███        ██████     ███      ███
-   ██     ███████████████                  C O M M A N D   L I N E   I N T E R F A C E                                               
+   ██     ███████████████                  C O M M A N D   L I N E   I N T E R F A C E
   █        ███████████                                                                    
 █                                          get lastest version on GitHub @siriusbontea
 
