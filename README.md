@@ -14,9 +14,9 @@
     ███                  ███           ███        ███   ███     ███      ███  ███   ███   
     █████              █████            ████████████    ███      ████  ████   ███    ███  
     ███              █████                 ███████      ███        ██████     ███      ███
-   ██     ███████████████                                                                 
+   ██     ███████████████                  C O M M A N D   L I N E   I N T E R F A C E                                               
   █        ███████████                                                                    
-█
+█                                          get lastest version on GitHub @siriusbontea
 
 ```
 Grok CLI is a terminal-based interactive coding assistant powered by xAI's Grok models (Grok-4 and Grok-Code-Fast-1). It allows you to chat with the AI for coding advice, generate and save code, manage Python projects, and automate development tasks like virtual environments, Git operations, Docker setup, and more—all from a single CLI interface.
