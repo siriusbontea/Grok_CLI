@@ -15,7 +15,7 @@ from rich.table import Table  # For displaying tabular data
 from openai import OpenAI  # Client for interacting with xAI's API (compatible with OpenAI format)
 from prompt_toolkit import prompt  # For advanced styled prompts with better cursor control
 from prompt_toolkit.styles import Style  # For customizing prompt styles
-from prompt_toolkit.completion import WordCompleter, PathCompleter, Completer, Completion  # For tab completion
+from prompt_toolkit.completion import WordCompleter, PathCompleter, Completer  # For tab completion
 
 # Initialize console for rich output
 console = Console()
@@ -29,12 +29,17 @@ MODEL = "grok-4"
 # Conversation history starting with system prompt
 HISTORY = [{
     "role": "system",
-    "content": "You are Grok-4, a powerful coding assistant by xAI. "
-               "CLI mode. Never say Grok-2. Models: grok-4, grok-code-fast-1. "
-               "Commands: model, preview, dockerize, review, debug, help, cd, ls. "
-               "When a user asks to create or populate a file, output the content in a fenced code block "
-               "with the appropriate language (e.g., markdown for README.md files, python for .py). "
-               "Use the most suitable file extension based on context. If a filename is suggested in the prompt, use it."
+    "content": (
+        "You are Grok-4, a powerful general-purpose assistant in CLI mode. "
+        "Models: grok-4, grok-code-fast-1. "
+        "Commands: model, preview, dockerize, review, debug, help, cd, ls, mkdir, touch, rm, mv, cp, "
+        "venv (create/activate), pip install, requirements generate, git (init/status/add/push), "
+        "clear, history, run, test, quit/exit. "
+        "For precise file edits, use: ```artifact
+        "This creates or updates the exact file. Use relative paths. "
+        "For quick scripts, use regular ```python\ncode\n```. "
+        "Agents must use ```artifact``` for multi-file coordination."
+    )
 }]
 
 # Mapping of code languages to file extensions for saving generated code
@@ -51,6 +56,10 @@ EXTENSION_MAP = {
     "latex": ".tex",
     "": ".txt"  # Default extension if language not specified
 }
+
+# Artifact block delimiters
+ARTIFACT_START = "```artifact"
+ARTIFACT_END = "```"
 
 # Record the initial working directory to restrict navigation
 INITIAL_CWD = os.path.realpath(os.getcwd())
@@ -72,7 +81,6 @@ def run_command(cmd, bg=False):
         bool: True if successful (return code 0), False otherwise.
     """
     try:
-        # Split into list while preserving quoted arguments
         args = shlex.split(cmd)
         if bg:
             subprocess.Popen(args)
@@ -94,9 +102,8 @@ def get_context_percentage():
     Returns:
         tuple: (color str, percentage int) for display.
     """
-    # Rough token estimation: average word length ~4 chars per token
     total_tokens = sum(len(m["content"]) for m in HISTORY) // 4
-    max_context = 128000  # Assumed max tokens for the model
+    max_context = 128000
     percent = (total_tokens / max_context) * 100
     if percent <= 70:
         color = "green"
@@ -113,11 +120,11 @@ def get_formatted_cwd():
     if cwd == home:
         return "~"
     elif cwd.startswith(home):
-        return "~" + cwd[len(home):].replace("\\", "/")  # Use / for Unix-like display
+        return "~" + cwd[len(home):].replace("\\", "/")
     else:
         return cwd.replace("\\", "/")
 
-# ANSI color codes for prompt styling based on context percentage
+# ANSI color codes for prompt styling
 color_map = {
     'green': 'ansigreen',
     'yellow': 'ansiyellow',
@@ -126,12 +133,8 @@ color_map = {
 
 def extract_suggested_filename(user_input):
     """
-    Parse the user input to extract a suggested filename if mentioned (e.g., "file called README.md").
-
-    Returns:
-        str or None: The suggested filename if found, else None.
+    Parse the user input to extract a suggested filename if mentioned.
     """
-    # Improved regex to match various phrases like "create a file called X", "populate X with", "make file Y", etc.
     patterns = [
         r"(?:create|make|generate|write|add)\s+(?:a|the)?\s+file\s+(?:called|named)?\s*([^\s\"';]+?\.\w+)",
         r"(?:populate|fill|update)\s+([^\s\"';]+?\.\w+)\s+(?:with|using)",
@@ -145,9 +148,8 @@ def extract_suggested_filename(user_input):
 
 def display_startup_message():
     """Display the ASCII logo, list of commands, and help instruction on startup."""
-    # ASCII art logo in light gray
     logo = """\
-                                  █                                                         
+                                █                                                         
                               █                                                           
             ████████        ██                                                            
         ███████████████    ██                                                             
@@ -166,9 +168,8 @@ def display_startup_message():
 █                                          get lastest version on GitHub @siriusbontea
 
                                                                                             """
-    print(f"\033[37m{logo}\033[0m")  # Print logo in ANSI light gray
+    print(f"\033[37m{logo}\033[0m")
 
-    # Display list of available commands
     console.print("[bold]Commands:[/]\n"
                   "model (fast/best), preview, dockerize, review, debug (model), cd [path], ls, "
                   "mkdir [dir], touch [file], rm [path], mv [src] [dst], cp [src] [dst], "
@@ -177,7 +178,7 @@ def display_startup_message():
     console.print("[dim]Type 'help' for detailed descriptions.[/]\n")
 
 class CustomCompleter(Completer):
-    """Custom completer for commands and paths where appropriate."""
+    """Custom completer for commands and paths."""
     def __init__(self):
         self.command_completer = WordCompleter([
             'model fast', 'model best', 'preview', 'dockerize', 'review', 'debug model',
@@ -191,37 +192,27 @@ class CustomCompleter(Completer):
     def get_completions(self, document, complete_event):
         text = document.text_before_cursor.lower()
         if text.startswith(('cd ', 'mkdir ', 'touch ', 'rm ', 'mv ', 'cp ', 'run ', 'git add ')):
-            # Use path completer for commands that take paths
-            word_before = document.get_word_before_cursor()
             return self.path_completer.get_completions(document, complete_event)
         else:
-            # Use command completer otherwise
             return self.command_completer.get_completions(document, complete_event)
 
 def chat():
-    """Main loop for the CLI: display startup message, handle user input, commands, and AI chats."""
-    global MODEL  # Allow modifying the global model variable
-    global HISTORY  # Allow modifying the conversation history
-    display_startup_message()  # Show logo, commands list, and help instruction
+    """Main loop for the CLI."""
+    global MODEL, HISTORY
+    display_startup_message()
 
-    # Style for the user prompt
     prompt_style = Style.from_dict({
-        'percentage': 'green',  # Default; overridden dynamically
-        'cwd': 'ansiblue',  # Blue for directory, shell-like
-        'prompt-symbol': 'ansigreen',  # Green for the ❯ symbol
+        'percentage': 'green',
+        'cwd': 'ansiblue',
+        'prompt-symbol': 'ansigreen',
     })
-
-    # Set up custom completer for tab completion
     completer = CustomCompleter()
 
     while True:
         try:
-            # Get context usage for prompt color
             color, percent = get_context_percentage()
             ansi_color = color_map[color]
-            # Get formatted current directory
             formatted_cwd = get_formatted_cwd()
-            # Construct styled prompt with context percentage, cwd, and ❯
             prompt_message = [
                 ('', '(@ '),
                 (f'fg:{ansi_color}', f'{percent}%'),
@@ -229,54 +220,48 @@ def chat():
                 ('class:cwd', f'{formatted_cwd} '),
                 ('class:prompt-symbol', '❯ '),
             ]
-            # Get user input with tab completion
             user = prompt(prompt_message, style=prompt_style, completer=completer)
             if user.lower() in {"quit", "exit"}: break
             if not user.strip(): continue
 
-            # Handle 'help' command: display command table with detailed descriptions
+            # === COMMANDS ===
             if user.lower() == "help":
                 table = Table(title="Grok CLI Commands")
                 table.add_column("Command", style="cyan")
                 table.add_column("Description")
                 commands = [
                     ("model fast/best", "Switch between grok-code-fast-1 (fast) and grok-4 (best) models"),
-                    ("preview", "Auto-start web server if a web app is detected (e.g., FastAPI or Flask)"),
-                    ("dockerize", "Generate Dockerfile and docker-compose.yml, then build the image"),
-                    ("review", "Perform AI-based code review on Python files in the project"),
-                    ("debug model", "Display debug info: model, Python path, directory, venv, git status"),
-                    ("cd [path]", "Change working directory (supports ~, .., relative/absolute paths; restricted to project dir and subdirs)"),
-                    ("ls", "List files and directories in the current directory"),
-                    ("mkdir [dir]", "Create a new directory (creates parents if needed)"),
-                    ("touch [file]", "Create an empty file"),
-                    ("rm [path]", "Delete a file or directory (with confirmation)"),
-                    ("mv [src] [dst]", "Move/rename a file or directory"),
-                    ("cp [src] [dst]", "Copy a file or directory"),
-                    ("venv create", "Create a virtual environment in .venv"),
-                    ("venv activate", "Print instructions to activate the virtual environment"),
-                    ("pip install [pkg]", "Install a Python package using pip in the current env"),
-                    ("requirements generate", "Generate/update requirements.txt from imports (basic scan)"),
-                    ("git init", "Initialize a new Git repository"),
-                    ("git status", "Show Git repository status"),
-                    ("git add [file or .]", "Stage changes for commit"),
-                    ("git push", "Push committed changes to origin/main (prompt for remote if needed)"),
-                    ("clear", "Clear the conversation history"),
-                    ("history", "Display a summary of the conversation history"),
-                    ("run [file]", "Run a Python file"),
-                    ("test", "Run tests using pytest if detected, or generate basic tests via AI"),
-                    ("quit/exit", "Exit the CLI"),
-                    ("help", "Show this command menu")
+                    ("preview", "Auto-start web server if a web app is detected"),
+                    ("dockerize", "Generate Dockerfile and docker-compose.yml"),
+                    ("review", "AI-based code review on Python files"),
+                    ("debug model", "Show model, Python, dir, venv, git status"),
+                    ("cd [path]", "Change directory (restricted to project)"),
+                    ("ls", "List files"),
+                    ("mkdir [dir]", "Create directory"),
+                    ("touch [file]", "Create empty file"),
+                    ("rm [path]", "Delete file/dir (with confirm)"),
+                    ("mv [src] [dst]", "Move/rename"),
+                    ("cp [src] [dst]", "Copy"),
+                    ("venv create", "Create .venv"),
+                    ("venv activate", "Print activation instructions"),
+                    ("pip install [pkg]", "Install package"),
+                    ("requirements generate", "Scan imports → requirements.txt"),
+                    ("git init/status/add/push", "Git operations"),
+                    ("clear", "Clear conversation history"),
+                    ("history", "Show chat summary"),
+                    ("run [file]", "Run Python file"),
+                    ("test", "Run pytest or generate tests"),
+                    ("quit/exit", "Exit"),
+                    ("help", "This menu")
                 ]
                 for cmd, desc in commands:
                     table.add_row(cmd, desc)
                 console.print(table)
                 continue
 
-            # Handle 'debug model' command: show debug info table
             if user.lower() == "debug model":
                 table = Table(title="Debug Info")
-                table.add_column("Key")
-                table.add_column("Value")
+                table.add_column("Key"); table.add_column("Value")
                 table.add_row("Model", MODEL)
                 table.add_row("Python", str(get_python()))
                 table.add_row("Dir", os.getcwd())
@@ -285,16 +270,13 @@ def chat():
                 console.print(table)
                 continue
 
-            # Handle 'cd' command: change directory with restriction to initial cwd and subdirs
             if user.lower().startswith("cd "):
                 raw_path = user.split(maxsplit=1)[1].strip() if len(user.split()) > 1 else "~"
                 try:
-                    # Expand user and resolve relative to current cwd
                     expanded = Path(raw_path).expanduser()
                     new_path = (Path.cwd() / expanded).resolve()
-                    # Ensure new_path is inside INITIAL_CWD
                     if not str(new_path).startswith(INITIAL_CWD):
-                        console.print("[red]Cannot navigate outside the project directory.[/]")
+                        console.print("[red]Cannot navigate outside project.[/]")
                         continue
                     os.chdir(new_path)
                     console.print(f"[green]Changed to: {os.getcwd()}[/]")
@@ -302,11 +284,10 @@ def chat():
                     console.print(f"[red]Error: {e}[/]")
                 continue
 
-            # Handle 'ls' command: list current directory
             if user.lower() == "ls":
                 files = os.listdir(".")
                 if not files:
-                    console.print("[dim]Empty directory[/]")
+                    console.print("[dim]Empty[/]")
                     continue
                 table = Table(title="Current Directory")
                 table.add_column("Type", style="cyan")
@@ -317,43 +298,36 @@ def chat():
                 console.print(table)
                 continue
 
-            # Handle 'mkdir' command: create directory
             if user.lower().startswith("mkdir "):
-                dir_name = user.split(maxsplit=1)[1].strip() if len(user.split()) > 1 else ""
+                dir_name = user.split(maxsplit=1)[1].strip()
                 if not dir_name:
-                    console.print("[red]Usage: mkdir [dir_name][/]")
+                    console.print("[red]Usage: mkdir [dir][/]")
                     continue
                 try:
                     Path(dir_name).mkdir(parents=True, exist_ok=True)
-                    console.print(f"[green]Created directory: {dir_name}[/]")
+                    console.print(f"[green]Created: {dir_name}[/]")
                 except Exception as e:
                     console.print(f"[red]Error: {e}[/]")
                 continue
 
-            # Handle 'touch' command: create empty file
             if user.lower().startswith("touch "):
-                file_name = user.split(maxsplit=1)[1].strip() if len(user.split()) > 1 else ""
+                file_name = user.split(maxsplit=1)[1].strip()
                 if not file_name:
-                    console.print("[red]Usage: touch [file_name][/]")
+                    console.print("[red]Usage: touch [file][/]")
                     continue
                 try:
                     Path(file_name).touch(exist_ok=True)
-                    console.print(f"[green]Created file: {file_name}[/]")
+                    console.print(f"[green]Created: {file_name}[/]")
                 except Exception as e:
                     console.print(f"[red]Error: {e}[/]")
                 continue
 
-            # Handle 'rm' command: delete file or directory with confirmation
             if user.lower().startswith("rm "):
-                path = user.split(maxsplit=1)[1].strip() if len(user.split()) > 1 else ""
-                if not path:
-                    console.print("[red]Usage: rm [path][/]")
+                path = user.split(maxsplit=1)[1].strip()
+                if not path or not Path(path).exists():
+                    console.print("[red]Path not found[/]")
                     continue
-                if not Path(path).exists():
-                    console.print(f"[red]Path not found: {path}[/]")
-                    continue
-                confirm = Prompt.ask(f"[yellow]Delete {path}? (y/n)[/]", default="n")
-                if confirm.lower() != "y":
+                if Prompt.ask(f"[yellow]Delete {path}? (y/n)[/]", default="n").lower() != "y":
                     continue
                 try:
                     if Path(path).is_dir():
@@ -365,7 +339,6 @@ def chat():
                     console.print(f"[red]Error: {e}[/]")
                 continue
 
-            # Handle 'mv' command: move/rename file or directory
             if user.lower().startswith("mv "):
                 parts = user.split(maxsplit=2)
                 if len(parts) < 3:
@@ -374,12 +347,11 @@ def chat():
                 src, dst = parts[1], parts[2]
                 try:
                     shutil.move(src, dst)
-                    console.print(f"[green]Moved: {src} -> {dst}[/]")
+                    console.print(f"[green]Moved: {src} → {dst}[/]")
                 except Exception as e:
                     console.print(f"[red]Error: {e}[/]")
                 continue
 
-            # Handle 'cp' command: copy file or directory
             if user.lower().startswith("cp "):
                 parts = user.split(maxsplit=2)
                 if len(parts) < 3:
@@ -391,12 +363,11 @@ def chat():
                         shutil.copytree(src, dst)
                     else:
                         shutil.copy(src, dst)
-                    console.print(f"[green]Copied: {src} -> {dst}[/]")
+                    console.print(f"[green]Copied: {src} → {dst}[/]")
                 except Exception as e:
                     console.print(f"[red]Error: {e}[/]")
                 continue
 
-            # Handle model switching commands
             if user.lower() == "model fast":
                 MODEL = "grok-code-fast-1"
                 console.print("[green]→ grok-code-fast-1[/]")
@@ -406,26 +377,22 @@ def chat():
                 console.print("[green]→ grok-4[/]")
                 continue
 
-            # Handle 'preview' command: start web server if detected
             if user.lower() == "preview":
-                if Path("main.py").exists() and "fastapi" in Path("main.py").read_text():
+                if Path("main.py").exists() and "fastapi" in Path("main.py").read_text().lower():
                     run_command("uvicorn main:app --reload", bg=True)
-                elif Path("app.py").exists() and "flask" in Path("app.py").read_text():
+                elif Path("app.py").exists() and "flask" in Path("app.py").read_text().lower():
                     run_command("flask run", bg=True)
                 else:
                     console.print("[red]No web app detected[/]")
                 continue
 
-            # Handle 'dockerize' command: generate Docker files and build image
             if user.lower() == "dockerize":
-                # Basic Dockerfile content
                 dockerfile = '''FROM python:3.12-slim
 WORKDIR /app
 COPY . .
 RUN pip install -r requirements.txt
 CMD ["python", "main.py"]
 '''
-                # Basic docker-compose.yml content
                 compose = '''version: "3.8"
 services:
   app:
@@ -435,205 +402,190 @@ services:
 '''
                 Path("Dockerfile").write_text(dockerfile)
                 Path("docker-compose.yml").write_text(compose)
-                console.print("[green]Dockerfile + docker-compose.yml created[/]")
+                console.print("[green]Docker files created[/]")
                 run_command("docker build -t grok-app .")
                 continue
 
-            # Handle 'review' command: AI-based code review
             if user.lower() == "review":
-                # Find all Python files in current directory and subdirs
                 files = list(Path(".").rglob("*.py"))
                 if not files:
-                    console.print("[red]No .py files found[/]")
+                    console.print("[red]No .py files[/]")
                     continue
-                # Concatenate code with file headers (limit to ~30k chars)
                 code = "\n\n".join(f"# {f}\n{f.read_text()}" for f in files)
-                HISTORY.append({"role": "user", "content": f"Review this code for bugs, performance, style:\n\n{code[:30000]}"})
+                HISTORY.append({"role": "user", "content": f"Review this code:\n\n{code[:30000]}"})
                 with console.status("Reviewing..."):
-                    # Call AI with low temperature for deterministic review
                     resp = client.chat.completions.create(model=MODEL, messages=HISTORY, temperature=0.2)
                 review = resp.choices[0].message.content
                 console.print(Markdown(f"## Code Review\n{review}"))
                 HISTORY.append({"role": "assistant", "content": review})
                 continue
 
-            # Handle 'venv create' command: create virtual environment
             if user.lower() == "venv create":
                 if Path(".venv").exists():
-                    console.print("[yellow].venv already exists[/]")
+                    console.print("[yellow].venv exists[/]")
                     continue
                 run_command("python3 -m venv .venv")
-                console.print("[green]Virtual environment created in .venv[/]")
+                console.print("[green].venv created[/]")
                 continue
 
-            # Handle 'venv activate' command: print activation instructions
             if user.lower() == "venv activate":
-                console.print("[yellow]To activate: source .venv/bin/activate (Unix) or .venv\\Scripts\\activate (Windows)[/]")
-                console.print("[dim]Note: Activation affects your shell, not this CLI session. Restart CLI after activation.[/]")
+                console.print("[yellow]source .venv/bin/activate (Unix) or .venv\\Scripts\\activate (Win)[/]")
                 continue
 
-            # Handle 'pip install' command: install package
             if user.lower().startswith("pip install "):
                 pkg = user.split(maxsplit=2)[2].strip() if len(user.split()) > 2 else ""
                 if not pkg:
-                    console.print("[red]Usage: pip install [package][/]")
+                    console.print("[red]Usage: pip install [pkg][/]")
                     continue
                 run_command(f"{get_python()} -m pip install {pkg}")
                 continue
 
-            # Handle 'requirements generate' command: basic requirements.txt generation
             if user.lower() == "requirements generate":
-                # Simple scan for imports in .py files
                 files = list(Path(".").rglob("*.py"))
                 imports = set()
                 for f in files:
                     try:
-                        content = f.read_text()
-                        for line in content.splitlines():
-                            if line.startswith("import ") or line.startswith("from "):
+                        for line in f.read_text().splitlines():
+                            if line.startswith(("import ", "from ")):
                                 pkg = line.split()[1].split(".")[0]
-                                if pkg not in {"os", "re", "sys", "builtins"}:  # Skip stdlib
+                                if pkg not in {"os", "re", "sys", "builtins"}:
                                     imports.add(pkg)
-                    except:
-                        pass
+                    except: pass
                 if not imports:
-                    console.print("[red]No imports found[/]")
+                    console.print("[red]No imports[/]")
                     continue
-                reqs = "\n".join(sorted(imports)) + "\n"
-                Path("requirements.txt").write_text(reqs)
-                console.print("[green]Generated requirements.txt[/]")
+                Path("requirements.txt").write_text("\n".join(sorted(imports)) + "\n")
+                console.print("[green]requirements.txt generated[/]")
                 continue
 
-            # Handle Git commands
             if user.lower().startswith("git "):
-                subcmd = user.lower().split(maxsplit=1)[1].strip() if len(user.split()) > 1 else ""
-                if subcmd == "init":
+                sub = user.lower().split(maxsplit=1)[1] if len(user.split()) > 1 else ""
+                if sub == "init":
                     run_command("git init")
-                    continue
-                elif subcmd == "status":
+                elif sub == "status":
                     run_command("git status")
-                    continue
-                elif subcmd.startswith("add "):
-                    add_path = subcmd.split(maxsplit=1)[1].strip() if len(subcmd.split()) > 1 else "."
-                    run_command(f"git add {add_path}")
-                    continue
-                elif subcmd == "push":
-                    if not run_command("git remote get-url origin", bg=False):  # Check if remote exists
-                        remote = Prompt.ask("[yellow]Set remote URL (e.g., git@github.com:user/repo.git):[/]")
+                elif sub.startswith("add "):
+                    p = sub.split(maxsplit=1)[1] if len(sub.split()) > 1 else "."
+                    run_command(f"git add {p}")
+                elif sub == "push":
+                    if not run_command("git remote get-url origin", bg=False):
+                        remote = Prompt.ask("[yellow]Remote URL:[/]")
                         run_command(f"git remote add origin {remote}")
                     run_command("git push -u origin main")
-                    continue
                 else:
-                    console.print("[red]Unknown git subcommand. Supported: init, status, add [file], push[/]")
-                    continue
-
-            # Handle 'clear' command: reset conversation history
-            if user.lower() == "clear":
-                HISTORY = [HISTORY[0]]  # Keep system prompt
-                console.print("[green]Conversation history cleared[/]")
+                    console.print("[red]Supported: init, status, add [file], push[/]")
                 continue
 
-            # Handle 'history' command: display conversation summary
+            if user.lower() == "clear":
+                HISTORY = [HISTORY[0]]
+                console.print("[green]History cleared[/]")
+                continue
+
             if user.lower() == "history":
                 if len(HISTORY) <= 1:
-                    console.print("[dim]No history yet[/]")
+                    console.print("[dim]No history[/]")
                     continue
-                table = Table(title="Conversation History")
+                table = Table(title="History")
                 table.add_column("Role", style="cyan")
-                table.add_column("Content (truncated)")
-                for msg in HISTORY[1:]:  # Skip system prompt
-                    content = msg["content"][:100] + "..." if len(msg["content"]) > 100 else msg["content"]
-                    table.add_row(msg["role"], content)
+                table.add_column("Content")
+                for msg in HISTORY[1:]:
+                    c = msg["content"][:100] + "..." if len(msg["content"]) > 100 else msg["content"]
+                    table.add_row(msg["role"], c)
                 console.print(table)
                 continue
 
-            # Handle 'run' command: run a Python file
             if user.lower().startswith("run "):
-                file = user.split(maxsplit=1)[1].strip() if len(user.split()) > 1 else ""
+                file = user.split(maxsplit=1)[1].strip()
                 if not file or not Path(file).exists() or not file.endswith(".py"):
-                    console.print("[red]Usage: run [python_file.py][/]")
+                    console.print("[red]Usage: run [file.py][/]")
                     continue
                 run_command(f"{get_python()} {file}")
                 continue
 
-            # Handle 'test' command: run tests or generate via AI
             if user.lower() == "test":
                 if Path("tests").exists() or any(p.name.startswith("test_") for p in Path(".").iterdir()):
                     run_command("pytest -q")
                 else:
-                    # Generate basic tests via AI
                     files = list(Path(".").rglob("*.py"))
                     if not files:
-                        console.print("[red]No .py files found[/]")
+                        console.print("[red]No .py files[/]")
                         continue
                     code = "\n\n".join(f"# {f}\n{f.read_text()}" for f in files)
-                    HISTORY.append({"role": "user", "content": f"Generate basic pytest tests for this code:\n\n{code[:20000]}"})
-                    with console.status("Generating tests..."):
+                    HISTORY.append({"role": "user", "content": f"Generate pytest tests:\n\n{code[:20000]}"})
+                    with console.status("Generating..."):
                         resp = client.chat.completions.create(model=MODEL, messages=HISTORY, temperature=0.5)
                     tests = resp.choices[0].message.content
-                    console.print(Markdown(f"## Generated Tests\n{tests}"))
+                    console.print(Markdown(f"## Tests\n{tests}"))
                     HISTORY.append({"role": "assistant", "content": tests})
-                    # Offer to save tests
-                    save = Prompt.ask("[green]Save tests? (y/n)[/]", default="y")
-                    if save.lower() == "y":
+                    if Prompt.ask("[green]Save? (y/n)[/]", default="y").lower() == "y":
                         Path("test_generated.py").write_text(tests)
                         console.print("[green]Saved: test_generated.py[/]")
                 continue
 
-            # General AI chat: append user message and get response
+            # === AI CHAT + ARTIFACTS ===
             HISTORY.append({"role": "user", "content": user})
             with console.status("[bold green]Grok thinking..."):
-                # Call AI with moderate temperature for creative responses
                 resp = client.chat.completions.create(model=MODEL, messages=HISTORY, temperature=0.3, max_tokens=4096)
             reply = resp.choices[0].message.content
             console.print(Markdown(reply))
             HISTORY.append({"role": "assistant", "content": reply})
 
-            # Detect and handle multiple code blocks in AI response
-            code_matches = re.findall(r"```(\w*)\n(.*?)\n```", reply, re.DOTALL)
-            for i, code_match in enumerate(code_matches):
-                language = code_match[0].lower()
-                code = code_match[1].strip() + "\n"
-                ext = EXTENSION_MAP.get(language, ".txt")
-                # Extract suggested filename from user input (for first block) or default
-                suggested_filename = extract_suggested_filename(user) if i == 0 else None
-                if suggested_filename:
-                    default = suggested_filename
-                else:
-                    default = f"generated_{i}{ext}"
-                # Prompt to save the code
-                save = Prompt.ask(f"[green]Save {language or 'file'} #{i+1}? (y/n/[filename])[/]", default="y")
-                if save in {"n", "no"}:
+            # === CODE BLOCK + ARTIFACT HANDLING ===
+            code_matches = []
+            # Regular code blocks
+            code_matches.extend(re.findall(r"```(\w*)\n(.*?)\n```", reply, re.DOTALL))
+            # Artifact blocks: ```artifact path/to/file.py\ncontent\n```
+            artifact_matches = re.findall(rf"{ARTIFACT_START}\s+([^\n]+)\n(.*?)\n{ARTIFACT_END}", reply, re.DOTALL)
+            for path, content in artifact_matches:
+                lang = Path(path).suffix.lstrip(".") or "text"
+                code_matches.append((lang, content.strip() + "\n", path.strip()))
+
+            for idx, match in enumerate(code_matches):
+                if len(match) == 3:  # (lang, code, path) → artifact
+                    language, code, target_path = match
+                    save_path = Path(target_path)
+                    console.print(f"[bold cyan]Artifact → {save_path}[/]")
+                else:  # (lang, code) → regular
+                    language, code = match
+                    ext = EXTENSION_MAP.get(language, ".txt")
+                    suggested = extract_suggested_filename(user) if idx == 0 else None
+                    default = suggested or f"generated_{idx}{ext}"
+                    save = Prompt.ask(f"[green]Save {language or 'file'} #{idx+1}? (y/n/[filename])[/]", default="y")
+                    if save in {"n", "no"}: continue
+                    path_input = save if save not in {"y", "yes"} else Prompt.ask("Save as", default=default)
+                    save_path = Path(path_input)
+
+                # === UNIFIED SAVE LOGIC ===
+                full = save_path.resolve()
+                if not str(full).startswith(INITIAL_CWD):
+                    console.print(f"[red]Blocked: outside project[/]")
                     continue
-                path = save if save not in {"y", "yes"} else Prompt.ask("Save as", default=default)
-                # Check for overwrite
-                full = Path(path).resolve()
                 if full.exists():
-                    overwrite = Prompt.ask(f"[yellow]{full} exists. Overwrite? (y/n)[/]", default="n")
-                    if overwrite.lower() != "y":
+                    if Prompt.ask(f"[yellow]{full} exists. Overwrite?[/]", default="n").lower() != "y":
                         continue
-                # Resolve and save to full path
                 full.parent.mkdir(parents=True, exist_ok=True)
                 full.write_text(code)
                 console.print(f"[green]Saved: {full}[/]")
-                # Optionally run if Python file
+
+                # Auto-run
                 if full.suffix == ".py" and Prompt.ask("[yellow]Run now?[/]", default="y") == "y":
                     run_command(f"{get_python()} {full}")
-                # Optionally run tests if test suite detected
+
+                # Auto-test
                 if (Path("tests").exists() or any(p.name.startswith("test_") for p in Path(".").iterdir())):
                     if Prompt.ask("[yellow]Run tests?[/]", default="y") == "y":
                         run_command("pytest -q")
-                # Optionally commit to Git if repo exists
+
+                # Auto-commit
                 if Path(".git").exists() and Prompt.ask("[yellow]Git commit?[/]", default="y") == "y":
-                    # Use first line of reply as commit summary (truncated and safely quoted)
                     summary = reply.split("\n")[0][:50]
-                    safe_message = shlex.quote("Grok: " + summary)
-                    run_command(f'git add . && git commit -m {safe_message}')
+                    safe_msg = shlex.quote("Grok: " + summary)
+                    run_command(f"git add . && git commit -m {safe_msg}")
+
         except KeyboardInterrupt:
             break
         except Exception as e:
             console.print(f"[red]Error: {e}[/]")
 
-# Entry point: start the chat loop
 if __name__ == "__main__":
     chat()
