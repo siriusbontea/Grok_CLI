@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # This script implements the Grok CLI, an interactive coding assistant powered by xAI's Grok models.
 # It provides a terminal-based interface for chatting with AI, managing projects, and automating dev tasks.
-
 import os  # For environment variables, file operations, and directory navigation
 import re  # For regular expressions to detect code blocks and parse prompts
 import readline  # For arrow key editing in input (fallback if prompt_toolkit fails)
@@ -57,27 +56,30 @@ EXTENSION_MAP = {
 INITIAL_CWD = os.path.realpath(os.getcwd())
 
 def get_python():
-    """Determine the Python interpreter path, preferring virtual environment if available."""
+    """Return Path to preferred python executable."""
     venv_python = Path(".venv/bin/python")
-    return str(venv_python) if venv_python.exists() else "python3"
+    return venv_python if venv_python.exists() else Path("python3")
 
 def run_command(cmd, bg=False):
     """
-    Run a shell command, optionally in background.
-    
+    Run a shell command safely using a list of arguments.
+
     Args:
         cmd (str): The command to execute.
         bg (bool): If True, run in background without capturing output.
-    
+
     Returns:
         bool: True if successful (return code 0), False otherwise.
     """
     try:
+        # Split into list while preserving quoted arguments
+        args = shlex.split(cmd)
         if bg:
-            subprocess.Popen(cmd, shell=True)
-            console.print(f"[green]Started: {cmd}[/]")
+            subprocess.Popen(args)
+            console.print(f"[green]Started: {' '.join(args)}[/]")
             return True
-        result = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+
+        result = subprocess.run(args, capture_output=True, text=True)
         if result.stdout: console.print(f"[dim]{result.stdout}[/]")
         if result.stderr: console.print(f"[red]{result.stderr}[/]")
         return result.returncode == 0
@@ -88,7 +90,7 @@ def run_command(cmd, bg=False):
 def get_context_percentage():
     """
     Estimate the percentage of context window used by the conversation history.
-    
+
     Returns:
         tuple: (color str, percentage int) for display.
     """
@@ -125,7 +127,7 @@ color_map = {
 def extract_suggested_filename(user_input):
     """
     Parse the user input to extract a suggested filename if mentioned (e.g., "file called README.md").
-    
+
     Returns:
         str or None: The suggested filename if found, else None.
     """
@@ -146,25 +148,26 @@ def display_startup_message():
     # ASCII art logo in light gray
     logo = """\
                                   █                                                         
-                                █                                                           
-              ████████        ██                                                            
-          ███████████████    ██                                                             
-        ██████             ████              ██████                             ███         
-       ████              █████            ████████████                          ███         
-      ████             ███████           ███        ███                         ███         
-     ████            ███   ████         ███                ██████   ████████    ███     ███ 
-     ████          ██       ███         ███               ███     ████    ████  ███   ███   
-     ███         ██         ███         ███     ████████  ███     ███      ███  ███  ███    
-     ████                  ████         ███          ███  ███     ███      ███  ████████    
-      ███                  ███           ███        ███   ███     ███      ███  ███   ███   
-      █████              █████            ████████████    ███      ████  ████   ███    ███  
-      ███              █████                 ███████      ███        ██████     ███      ███
-     ██     ███████████████                  C O M M A N D   L I N E   I N T E R F A C E
-    █        ███████████                                                                    
-  █                                          get lastest version on GitHub @siriusbontea
+                              █                                                           
+            ████████        ██                                                            
+        ███████████████    ██                                                             
+      ██████             ████              ██████                             ███         
+     ████              █████            ████████████                          ███         
+    ████             ███████           ███        ███                         ███         
+   ████            ███   ████         ███                ██████   ████████    ███     ███ 
+   ████          ██       ███         ███               ███     ████    ████  ███   ███   
+   ███         ██         ███         ███     ████████  ███     ███      ███  ███  ███    
+   ████                  ████         ███          ███  ███     ███      ███  ████████    
+    ███                  ███           ███        ███   ███     ███      ███  ███   ███   
+    █████              █████            ████████████    ███      ████  ████   ███    ███  
+    ███              █████                 ███████      ███        ██████     ███      ███
+   ██     ███████████████                  C O M M A N D   L I N E   I N T E R F A C E
+  █        ███████████                                                                    
+█                                          get lastest version on GitHub @siriusbontea
+
                                                                                             """
     print(f"\033[37m{logo}\033[0m")  # Print logo in ANSI light gray
-    
+
     # Display list of available commands
     console.print("[bold]Commands:[/]\n"
                   "model (fast/best), preview, dockerize, review, debug (model), cd [path], ls, "
@@ -199,7 +202,6 @@ def chat():
     """Main loop for the CLI: display startup message, handle user input, commands, and AI chats."""
     global MODEL  # Allow modifying the global model variable
     global HISTORY  # Allow modifying the conversation history
-
     display_startup_message()  # Show logo, commands list, and help instruction
 
     # Style for the user prompt
@@ -217,10 +219,8 @@ def chat():
             # Get context usage for prompt color
             color, percent = get_context_percentage()
             ansi_color = color_map[color]
-
             # Get formatted current directory
             formatted_cwd = get_formatted_cwd()
-
             # Construct styled prompt with context percentage, cwd, and ❯
             prompt_message = [
                 ('', '(@ '),
@@ -229,7 +229,6 @@ def chat():
                 ('class:cwd', f'{formatted_cwd} '),
                 ('class:prompt-symbol', '❯ '),
             ]
-
             # Get user input with tab completion
             user = prompt(prompt_message, style=prompt_style, completer=completer)
             if user.lower() in {"quit", "exit"}: break
@@ -276,10 +275,11 @@ def chat():
             # Handle 'debug model' command: show debug info table
             if user.lower() == "debug model":
                 table = Table(title="Debug Info")
-                table.add_column("Key"); table.add_column("Value")
+                table.add_column("Key")
+                table.add_column("Value")
                 table.add_row("Model", MODEL)
-                table.add_row("Python", get_python())
-                table.add_row("Dir", os.getcwd())  # Updated to use os.getcwd() for real-time cwd
+                table.add_row("Python", str(get_python()))
+                table.add_row("Dir", os.getcwd())
                 table.add_row("Venv", "Yes" if Path(".venv").exists() else "No")
                 table.add_row("Git", "Yes" if Path(".git").exists() else "No")
                 console.print(table)
@@ -287,16 +287,17 @@ def chat():
 
             # Handle 'cd' command: change directory with restriction to initial cwd and subdirs
             if user.lower().startswith("cd "):
-                path = user.split(maxsplit=1)[1].strip() if len(user.split()) > 1 else os.path.expanduser("~")
+                raw_path = user.split(maxsplit=1)[1].strip() if len(user.split()) > 1 else "~"
                 try:
-                    new_path = os.path.realpath(os.path.expanduser(path))
-                    if not new_path.startswith(INITIAL_CWD):
+                    # Expand user and resolve relative to current cwd
+                    expanded = Path(raw_path).expanduser()
+                    new_path = (Path.cwd() / expanded).resolve()
+                    # Ensure new_path is inside INITIAL_CWD
+                    if not str(new_path).startswith(INITIAL_CWD):
                         console.print("[red]Cannot navigate outside the project directory.[/]")
                         continue
                     os.chdir(new_path)
                     console.print(f"[green]Changed to: {os.getcwd()}[/]")
-                except FileNotFoundError:
-                    console.print(f"[red]Directory not found: {path}[/]")
                 except Exception as e:
                     console.print(f"[red]Error: {e}[/]")
                 continue
@@ -398,10 +399,12 @@ def chat():
             # Handle model switching commands
             if user.lower() == "model fast":
                 MODEL = "grok-code-fast-1"
-                console.print("[green]→ grok-code-fast-1[/]"); continue
+                console.print("[green]→ grok-code-fast-1[/]")
+                continue
             if user.lower() == "model best":
                 MODEL = "grok-4"
-                console.print("[green]→ grok-4[/]"); continue
+                console.print("[green]→ grok-4[/]")
+                continue
 
             # Handle 'preview' command: start web server if detected
             if user.lower() == "preview":
@@ -441,7 +444,8 @@ services:
                 # Find all Python files in current directory and subdirs
                 files = list(Path(".").rglob("*.py"))
                 if not files:
-                    console.print("[red]No .py files found[/]"); continue
+                    console.print("[red]No .py files found[/]")
+                    continue
                 # Concatenate code with file headers (limit to ~30k chars)
                 code = "\n\n".join(f"# {f}\n{f.read_text()}" for f in files)
                 HISTORY.append({"role": "user", "content": f"Review this code for bugs, performance, style:\n\n{code[:30000]}"})
@@ -549,7 +553,7 @@ services:
                 if not file or not Path(file).exists() or not file.endswith(".py"):
                     console.print("[red]Usage: run [python_file.py][/]")
                     continue
-                os.system(f"{get_python()} {file}")
+                run_command(f"{get_python()} {file}")
                 continue
 
             # Handle 'test' command: run tests or generate via AI
@@ -591,48 +595,40 @@ services:
                 language = code_match[0].lower()
                 code = code_match[1].strip() + "\n"
                 ext = EXTENSION_MAP.get(language, ".txt")
-
                 # Extract suggested filename from user input (for first block) or default
                 suggested_filename = extract_suggested_filename(user) if i == 0 else None
                 if suggested_filename:
                     default = suggested_filename
                 else:
                     default = f"generated_{i}{ext}"
-
                 # Prompt to save the code
                 save = Prompt.ask(f"[green]Save {language or 'file'} #{i+1}? (y/n/[filename])[/]", default="y")
                 if save in {"n", "no"}:
                     continue
                 path = save if save not in {"y", "yes"} else Prompt.ask("Save as", default=default)
-
                 # Check for overwrite
                 full = Path(path).resolve()
                 if full.exists():
                     overwrite = Prompt.ask(f"[yellow]{full} exists. Overwrite? (y/n)[/]", default="n")
                     if overwrite.lower() != "y":
                         continue
-
                 # Resolve and save to full path
                 full.parent.mkdir(parents=True, exist_ok=True)
                 full.write_text(code)
                 console.print(f"[green]Saved: {full}[/]")
-
                 # Optionally run if Python file
                 if full.suffix == ".py" and Prompt.ask("[yellow]Run now?[/]", default="y") == "y":
-                    os.system(f"{get_python()} {full}")
-
+                    run_command(f"{get_python()} {full}")
                 # Optionally run tests if test suite detected
                 if (Path("tests").exists() or any(p.name.startswith("test_") for p in Path(".").iterdir())):
                     if Prompt.ask("[yellow]Run tests?[/]", default="y") == "y":
                         run_command("pytest -q")
-
                 # Optionally commit to Git if repo exists
                 if Path(".git").exists() and Prompt.ask("[yellow]Git commit?[/]", default="y") == "y":
                     # Use first line of reply as commit summary (truncated and safely quoted)
                     summary = reply.split("\n")[0][:50]
                     safe_message = shlex.quote("Grok: " + summary)
                     run_command(f'git add . && git commit -m {safe_message}')
-
         except KeyboardInterrupt:
             break
         except Exception as e:
