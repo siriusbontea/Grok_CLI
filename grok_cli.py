@@ -29,6 +29,8 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+
+# Release info: Grok CLI v1.2.5 
 # This script implements the Grok CLI, an interactive coding assistant powered by xAI's Grok models.
 # It provides a terminal-based interface for chatting with AI, managing projects, and automating dev tasks.
 import os
@@ -49,18 +51,21 @@ from prompt_toolkit.styles import Style as PTStyle
 from prompt_toolkit.completion import WordCompleter, PathCompleter, Completer
 
 # === Core setup ===
+# Initializes the console for rich output and the OpenAI client for API interactions with xAI.
+# Interacts with the main chat loop: Used for printing responses and querying the AI.
 console = Console()
 client = OpenAI(api_key=os.getenv("XAI_KEY"), base_url="https://api.x.ai/v1")
-MODEL = "grok-4"
+MODEL = "grok-4-fast-reasoning"
 
 # Conversation history starting with system prompt.
 # This defines the AI's persona, available models, commands, and guidelines for file edits/tools.
 # Interacts with the main chat loop: Appended to every API call for context.
 # Uses triple-quoted string for robustness and to prevent concatenation errors during copy/paste.
+# Updated to include new agents (debug, refactor) and enhanced test features for better competition with Claude Code.
 HISTORY = [{
     "role": "system",
     "content": """You are Grok-4, a powerful general-purpose assistant in CLI mode. 
-Models: grok-4, grok-code-fast-1. 
+Models: grok-code-fast-1, grok-4-fast-reasoning, grok-4-fast-non-reasoning, grok-4-0709. 
 Commands: model, preview, dockerize, review, debug, help, cd, ls, mkdir, touch, rm, mv, cp, 
 venv (create/activate), pip install, requirements generate, git (init/status/add/push), 
 clear, history, run, test, agent (list/add/help/call), fs (scan/diff), git (status/branch/pr), readme (generate), quit/exit. 
@@ -69,10 +74,13 @@ This creates or updates the exact file. Use relative paths.
 For quick scripts, use regular ```python\ncode\n```. 
 Agents must use ```artifact``` for multi-file coordination. 
 To use agents, output: ```tool fs scan``` or ```tool git status```. 
-CLI will execute and return results. Use for file scanning, git status, linting, etc. before planning."""
+CLI will execute and return results. Use for file scanning, git status, linting, etc. before planning.
+New agents: debug (run/analyze for error fixing), refactor (analyze/apply for code improvements), enhanced test (generate/run/coverage/fix)."""
 }]
 
 # Language → extension map
+# Maps code languages to file extensions for artifact saving.
+# Interacts with handle_artifacts: Used to determine default filenames when saving code blocks.
 EXTENSION_MAP = {
     "python": ".py", "markdown": ".md", "text": ".txt", "json": ".json",
     "yaml": ".yaml", "html": ".html", "css": ".css", "js": ".js",
@@ -80,18 +88,26 @@ EXTENSION_MAP = {
 }
 
 # Artifact / tool block delimiters
+# Defines patterns for extracting artifacts and tool calls from AI responses.
+# Interacts with handle_artifacts and the main loop: Used to parse and process AI outputs.
 ARTIFACT_START = "```artifact"
 ARTIFACT_END = "```"
 TOOL_CALL_START = "```tool"
 TOOL_CALL_END = "```"
 
 # Security: restrict all file ops to the directory where CLI was started
+# Ensures all operations stay within the project root for safety.
+# Interacts with file commands and agents: Checked in all Path.resolve() calls.
 INITIAL_CWD = os.path.realpath(os.getcwd())
 
 # Agent registry
+# Dictionary to hold loaded agents, lazy-loaded via 'agent add'.
+# Interacts with agent commands: Agents are instantiated and called from here.
 AGENTS = {}
 
 # Persistent readline history
+# Loads/saves command history for better UX across sessions.
+# Interacts with chat loop: Used by readline for input history.
 HISTORY_FILE = Path.home() / ".grok_cli_history"
 if HISTORY_FILE.exists():
     try:
@@ -110,10 +126,14 @@ if venv_path.exists():
     VENV_ACTIVE = True
 
 # === Helper functions ===
+# Returns the path to the Python executable, preferring venv if active.
+# Interacts with run_command: Used for executing Python scripts.
 def get_python() -> Path:
     venv_python = Path(".venv/bin/python") if VENV_ACTIVE else Path("python3")
     return venv_python if venv_python.exists() else Path("python3")
 
+# Executes shell commands, optionally in background or capturing output.
+# Interacts with agents and commands: Used for git, lint, test runs, etc. Handles venv activation.
 def run_command(cmd: str, bg: bool = False, capture_output: bool = True) -> subprocess.CompletedProcess | bool:
     if VENV_ACTIVE:
         cmd = f". .venv/bin/activate && {cmd}"
@@ -135,6 +155,8 @@ def run_command(cmd: str, bg: bool = False, capture_output: bool = True) -> subp
         console.print(f"[red]Error: {e}[/]")
         return False
 
+# Calculates context usage percentage for the conversation history.
+# Interacts with chat prompt: Displays in the prompt to warn of token limits.
 def get_context_percentage() -> tuple[str, int]:
     total_tokens = sum(len(m["content"]) for m in HISTORY) // 4
     max_context = 128000
@@ -142,6 +164,8 @@ def get_context_percentage() -> tuple[str, int]:
     color = "green" if percent <= 70 else "yellow" if percent <= 85 else "red"
     return color, percent
 
+# Formats the current working directory for display.
+# Interacts with chat prompt: Shows in the user prompt for navigation feedback.
 def get_formatted_cwd() -> str:
     cwd = os.getcwd()
     home = os.path.expanduser("~")
@@ -153,6 +177,8 @@ def get_formatted_cwd() -> str:
 
 color_map = {'green': 'ansigreen', 'yellow': 'ansiyellow', 'red': 'ansired'}
 
+# Extracts suggested filenames from user input for default saving.
+# Interacts with handle_artifacts: Used when prompting for save filenames.
 def extract_suggested_filename(user_input: str) -> str | None:
     patterns = [
         r"(?:create|make|generate|write|add)\s+(?:a|the)?\s+file\s+(?:called|named)?\s*([^\s\"';]+?\.\w+)",
@@ -171,6 +197,8 @@ ask_style = PTStyle.from_dict({
     'warning': 'ansiyellow',
 })
 
+# Prompts the user for input with custom styles and completers.
+# Interacts with commands and artifacts: Used for confirmations and filename inputs.
 def ask(prompt_text: str, default: str = "", completer: Completer = None, is_warning: bool = False) -> str:
     """Custom immutable prompt: Cursor stays right of text, preventing visual erasure on backspace."""
     cls = 'warning' if is_warning else 'prompt'
@@ -181,6 +209,8 @@ def ask(prompt_text: str, default: str = "", completer: Completer = None, is_war
         completer=completer,
     ).strip()
 
+# Processes AI replies to extract and save code/artifacts, with interactive prompts.
+# Interacts with _query_ai and main loop: Called after AI responses to handle file creations/updates and auto-chains.
 def handle_artifacts(reply: str, user_input: str) -> None:
     """Unified extraction & saving of code blocks and artifacts."""
     code_matches = re.findall(r"```(\w*)\n(.*?)\n```", reply, re.DOTALL)
@@ -232,6 +262,8 @@ def handle_artifacts(reply: str, user_input: str) -> None:
             safe_msg = shlex.quote("Grok: " + summary)
             run_command(f"git add . && git commit -m {safe_msg}")
 
+# Queries the AI with a prompt, handles response, artifacts, and appends to history.
+# Interacts with agents and commands: Used as a helper for AI-driven features like review, dockerize.
 def _query_ai(prompt: str, user_input: str) -> str:
     """Helper to query AI, print reply, handle artifacts. Used for commands/agents."""
     HISTORY.append({"role": "user", "content": prompt})
@@ -246,12 +278,16 @@ def _query_ai(prompt: str, user_input: str) -> str:
     return reply
 
 # === Agents ===
+# Base class for all agents, defining the handle_command interface.
+# Interacts with agent registry: All agents inherit this for consistency.
 class Agent:
     def __init__(self, name: str):
         self.name = name
     def handle_command(self, subcmd: str):
         raise NotImplementedError
 
+# File system agent for scanning and diffing projects.
+# Interacts with other agents: Often called for context (e.g., by refactor, debug).
 class FileSystemAgent(Agent):
     """File system operations with AI integration."""
     def handle_command(self, subcmd: str):
@@ -304,6 +340,8 @@ class FileSystemAgent(Agent):
     def _query_ai(self, prompt: str) -> str:
         return _query_ai(prompt, "fs command")
 
+# Git agent for status, branches, and PR creation.
+# Interacts with other agents: Used for committing changes after refactor or debug fixes.
 class GitAgent(Agent):
     """Git operations."""
     def handle_command(self, subcmd: str):
@@ -356,6 +394,8 @@ class GitAgent(Agent):
             console.print(f"[red]Git failed: {e}[/]")
             return None
 
+# Lint agent for code linting with AI fixes.
+# Interacts with refactor agent: Can be called for quality checks before refactoring.
 class LintAgent(Agent):
     """Code linting with AI fixes (Priority 3). Runs pylint/flake8, feeds issues to AI for artifact patches."""
     def handle_command(self, subcmd: str):
@@ -401,6 +441,8 @@ class LintAgent(Agent):
     def _query_ai(self, prompt: str) -> str:
         return _query_ai(prompt, "lint command")
 
+# Readme agent for generating README.md based on project info.
+# Interacts with fs and git agents: Uses them to gather structure and changes.
 class ReadmeAgent(Agent):
     """Generates robust README.md files based on project changes and files, following industry best practices."""
     def handle_command(self, subcmd: str):
@@ -450,12 +492,14 @@ Output the content in ```artifact README.md\n<content>\n``` for auto-saving."""
     def _query_ai(self, prompt: str) -> str:
         return _query_ai(prompt, "readme generate")
 
+# Enhanced Test agent with upgrades for coverage and fix subcommands.
+# Interacts with debug/refactor: Can be chained for TDD workflows, e.g., fix failing tests after debugging.
 class TestAgent(Agent):
-    """Test generation and running with AI integration."""
+    """Test generation and running with AI integration. Enhanced with coverage reports and AI test fixes."""
     def handle_command(self, subcmd: str):
         parts = subcmd.split()
         if not parts:
-            console.print("[red]Usage: test generate [file] | test run[/]")
+            console.print("[red]Usage: test generate [file] | test run | test coverage | test fix[/]")
             return None
         cmd = parts[0]
         if cmd == "generate":
@@ -476,13 +520,114 @@ class TestAgent(Agent):
                     return None
             success = run_command("pytest")
             return "Tests passed." if success else "Tests failed."
-        console.print("[red]Supported: generate [file or .], run[/]")
+        if cmd == "coverage":
+            # Install coverage.py if needed
+            check = run_command("pip show coverage")
+            if check.returncode != 0:
+                if ask("Install coverage? (y/n)", default="y") == "y":
+                    run_command("pip install coverage")
+                else:
+                    return None
+            run_command("coverage run -m pytest")
+            out = run_command("coverage report", capture_output=False)
+            return out
+        if cmd == "fix":
+            # Run tests, capture failures, feed to AI for fixes
+            test_out = run_command("pytest -v", capture_output=True)
+            if test_out.returncode == 0:
+                console.print("[green]All tests pass, no fixes needed.[/]")
+                return None
+            prompt = f"Failed tests:\n{test_out.stderr}\nGenerate fixes via artifacts."
+            return self._query_ai(prompt)
+        console.print("[red]Supported: generate [file or .], run, coverage, fix[/]")
         return None
 
     def _query_ai(self, prompt: str) -> str:
-        return _query_ai(prompt, "test generate")
+        return _query_ai(prompt, "test command")
+
+# New Debug agent for running code, capturing errors, and AI-fixing.
+# Interacts with test agent: Can chain to run tests after fixes.
+class DebugAgent(Agent):
+    """Debugging agent that runs code, captures errors, and uses AI to suggest fixes via artifacts."""
+    def handle_command(self, subcmd: str):
+        parts = subcmd.split()
+        if not parts:
+            console.print("[red]Usage: debug run [file] | debug analyze[/]")
+            return None
+        cmd = parts[0]
+        if cmd == "run" and len(parts) > 1:
+            target = " ".join(parts[1:])
+            if not Path(target).exists():
+                console.print("[red]File not found.[/]")
+                return None
+            result = run_command(f"{get_python()} {shlex.quote(target)}", capture_output=True)
+            if result.returncode == 0:
+                console.print("[green]Code ran successfully.[/]")
+                return result.stdout
+            error_out = result.stderr
+            console.print(Markdown(f"## Debug Error\n```\n{error_out}\n```"))
+            if ask("Fix with AI? (y/n)", default="y") == "y":
+                code = Path(target).read_text()
+                prompt = f"Code:\n{code[:5000]}\nError:\n{error_out}\nGenerate fixes via artifacts."
+                self._query_ai(prompt)
+            return error_out
+        if cmd == "analyze":
+            # Use fs scan for project-wide debug suggestions
+            if "fs" not in AGENTS:
+                console.print("[yellow]Adding fs agent for scan...[/]")
+                AGENTS["fs"] = FileSystemAgent("fs")
+            structure = AGENTS["fs"].handle_command("scan")
+            if not structure:
+                return None
+            prompt = f"Analyze project for potential bugs:\n{structure}\nSuggest fixes."
+            return self._query_ai(prompt)
+        console.print("[red]Supported: run [file], analyze[/]")
+        return None
+
+    def _query_ai(self, prompt: str) -> str:
+        return _query_ai(prompt, "debug command")
+
+# New Refactor agent for analyzing and applying code improvements.
+# Interacts with lint and fs: Calls lint for quality, fs for scan, outputs artifacts for changes.
+class RefactorAgent(Agent):
+    """Refactoring agent that analyzes code/project and suggests/applies improvements via artifacts."""
+    def handle_command(self, subcmd: str):
+        parts = subcmd.split()
+        if not parts:
+            console.print("[red]Usage: refactor analyze [file or .] | refactor apply[/]")
+            return None
+        cmd = parts[0]
+        if cmd == "analyze":
+            target = parts[1] if len(parts) > 1 else "."
+            if target != "." and not Path(target).exists():
+                console.print("[red]Target not found.[/]")
+                return None
+            if target == ".":
+                if "fs" not in AGENTS:
+                    AGENTS["fs"] = FileSystemAgent("fs")
+                structure = AGENTS["fs"].handle_command("scan")
+                prompt = f"Analyze project structure for refactoring:\n{structure}\nSuggest improvements via diffs/artifacts."
+            else:
+                code = Path(target).read_text()
+                prompt = f"Analyze code for refactoring:\n{code[:5000]}\nSuggest improvements via diffs/artifacts."
+            if "lint" in AGENTS:
+                lint_out = AGENTS["lint"].handle_command(f"run {target}")
+                if lint_out:
+                    prompt += f"\nLint issues:\n{lint_out}"
+            return self._query_ai(prompt)
+        if cmd == "apply":
+            # Assumes prior analyze; prompts AI to apply changes
+            prompt = "Apply previous refactoring suggestions via artifacts."
+            return self._query_ai(prompt)
+        console.print("[red]Supported: analyze [file or .], apply[/]")
+        return None
+
+    def _query_ai(self, prompt: str) -> str:
+        return _query_ai(prompt, "refactor command")
 
 # === Supported Agents Info (for help discovery) ===
+# Dictionary of supported agents with descriptions and examples for discoverability.
+# Interacts with help commands: Displayed in tables for 'agent help' or 'help agent'.
 SUPPORTED_AGENTS = {
     "fs": {
         "desc": "File system operations with AI integration (scan/diff with optional AI analysis).",
@@ -501,16 +646,26 @@ SUPPORTED_AGENTS = {
         "examples": ["readme generate (scans project and generates README)"]
     },
     "test": {
-        "desc": "Test generation and running with AI integration.",
-        "examples": ["test generate main.py (generate tests for file)", "test run (run pytest)"]
+        "desc": "Test generation and running with AI integration. Enhanced: coverage reports, AI fixes for failures.",
+        "examples": ["test generate main.py (generate tests for file)", "test run (run pytest)", "test coverage (run with coverage)", "test fix (AI-fix failures)"]
+    },
+    "debug": {
+        "desc": "Debugging with AI fixes (runs code, captures errors, suggests patches).",
+        "examples": ["debug run main.py (run and debug file)", "debug analyze (project-wide bug suggestions)"]
+    },
+    "refactor": {
+        "desc": "Code refactoring with AI (analyzes and applies improvements via diffs/artifacts).",
+        "examples": ["refactor analyze . (analyze project)", "refactor apply (apply suggestions)"]
     },
 }
 
 # === Command details for deep help ===
+# Dictionary of commands with descriptions and examples.
+# Interacts with help command: Displayed in tables for 'help' or 'help <cmd>'.
 COMMAND_HELP = {
     "model": {
-        "desc": "Switch model: `model fast` → grok-code-fast-1, `model best` → grok-4",
-        "examples": ["model fast", "model best"]
+        "desc": "Switch/view AI models (try 'help models' for details)",
+        "examples": ["model fast-reason", "model best"]
     },
     "preview": {
         "desc": "Auto-detect and start a web server (FastAPI, Flask, Streamlit, Django)",
@@ -560,7 +715,7 @@ COMMAND_HELP = {
     "test": {"desc": "Run pytest or generate tests", "examples": ["test"]},
     "agent": {
         "desc": "Manage agents (fs, git, …)",
-        "examples": ["agent list", "agent add fs", "agent call fs scan"]
+        "examples": ["agent list", "agent add fs", "agent help", "agent call fs scan"]
     },
     "fs": {
         "desc": "File system agent (scan/diff)",
@@ -570,14 +725,44 @@ COMMAND_HELP = {
         "desc": "README generation agent (generate)",
         "examples": ["readme generate"]
     },
+    "debug": {
+        "desc": "Debug agent (run/analyze)",
+        "examples": ["debug run main.py"]
+    },
+    "refactor": {
+        "desc": "Refactor agent (analyze/apply)",
+        "examples": ["refactor analyze ."]
+    },
     "quit": {"desc": "Exit CLI", "examples": ["quit", "exit"]},
 }
 
+# Model map for shorthands
+MODEL_MAP = {
+    "code": "grok-code-fast-1",
+    "code-fast": "grok-code-fast-1",
+    "fast-reason": "grok-4-fast-reasoning",
+    "fast-non": "grok-4-fast-non-reasoning",
+    "best": "grok-4-0709",
+    "0709": "grok-4-0709"
+}
+
+# Model details for help menu
+MODEL_DETAILS = [
+    {"model": "grok-code-fast-1", "shorthands": "code, code-fast", "desc": "Fast code gen/debug.", "context": "2M", "input_cost": "$0.20", "output_cost": "$1.50"},
+    {"model": "grok-4-fast-reasoning", "shorthands": "fast-reason", "desc": "Balanced speed/reasoning.", "context": "2M", "input_cost": "$0.20", "output_cost": "$0.50"},
+    {"model": "grok-4-fast-non-reasoning", "shorthands": "fast-non", "desc": "Ultra-fast for simple tasks.", "context": "2M", "input_cost": "$0.20", "output_cost": "$0.50"},
+    {"model": "grok-4-0709", "shorthands": "best, 0709", "desc": "Premium for complex reasoning.", "context": "256K", "input_cost": "$3.00", "output_cost": "$15.00"}
+]
+
 # === Tab completion ===
+# Custom completer for commands and paths.
+# Interacts with chat loop: Provides tab completion for UX.
+# Updated with new agent commands for discoverability.
 class CustomCompleter(Completer):
     def __init__(self):
         self.cmds = WordCompleter([
-            'model fast', 'model best', 'preview', 'dockerize', 'review', 'debug model',
+            'model code', 'model code-fast', 'model fast-reason', 'model fast-non', 'model best', 'model 0709',
+            'preview', 'dockerize', 'review', 'debug model',
             'cd ', 'ls', 'mkdir ', 'touch ', 'rm ', 'mv ', 'cp ',
             'venv create', 'venv activate', 'pip install ', 'requirements generate',
             'git init', 'git status', 'git add ', 'git push',
@@ -587,7 +772,8 @@ class CustomCompleter(Completer):
             'agent call git pr ', 'fs scan', 'fs diff ', 'readme generate',
             'agent call readme generate', 'agent add readme', 'agent add test',
             'agent call test generate ', 'agent call test run', 'test generate ',
-            'test run'
+            'test run', 'test coverage', 'test fix', 'agent add debug', 'debug run ',
+            'debug analyze', 'agent add refactor', 'refactor analyze ', 'refactor apply'
         ], ignore_case=True)
         self.paths = PathCompleter()
 
@@ -595,15 +781,19 @@ class CustomCompleter(Completer):
         text = document.text_before_cursor.lower()
         path_triggers = (
             'cd ', 'mkdir ', 'touch ', 'rm ', 'mv ', 'cp ', 'run ', 'git add ',
-            'fs diff ', 'agent call fs diff ', 'test generate '
+            'fs diff ', 'agent call fs diff ', 'test generate ', 'debug run ',
+            'refactor analyze '
         )
         if any(text.startswith(t) for t in path_triggers):
             return self.paths.get_completions(document, complete_event)
         return self.cmds.get_completions(document, complete_event)
 
 # === Startup UI ===
+# Displays the logo and onboarding message.
+# Interacts with chat: Shown on startup for user-first UX.
 def display_startup_message() -> None:
     logo = """\
+
                                 █                                                         
                               █                                                           
             ████████        ██                                                            
@@ -618,14 +808,17 @@ def display_startup_message() -> None:
     ███                  ███           ███        ███   ███     ███      ███  ███   ███   
     █████              █████            ████████████    ███      ████  ████   ███    ███  
     ███              █████                 ███████      ███        ██████     ███      ███
-   ██     ███████████████                  C O M M A N D   L I N E   I N T E R F A C E
+   ██     ███████████████                  𝘾 𝙊 𝙈 𝙈 𝘼 𝙉 𝘿    𝙇 𝙄 𝙉 𝙀    𝙄 𝙉 𝙏 𝙀 𝙍 𝙁 𝘼 𝘾 𝙀
   █        ███████████                                                                    
-█                                          get lastest version on GitHub @siriusbontea
+█                                               𝘨𝘦𝘵 𝘭𝘢𝘴𝘵𝘦𝘴𝘵 𝘷𝘦𝘳𝘴𝘪𝘰𝘯 𝘰𝘯 𝘎𝘪𝘵𝘏𝘶𝘣 @𝘴𝘪𝘳𝘪𝘶𝘴𝘣𝘰𝘯𝘵𝘦𝘢
                                                                                             """
-    console.print(f"\033[37m{logo}\033[0m")
+    console.print(logo, style="grey50")  # Medium grey; alternative: "dim" for subtle grey/dim effect
     console.print("[bold]Type 'help' for commands or 'help <cmd>' for details. For agents, try 'help agent' or 'agent help' to see available options.[/]")  # Enhanced onboarding for agents
+    console.print(f"[dim]Current model: {MODEL}[/]")  # Display current model on startup for awareness
 
 # === Main chat loop ===
+# Core loop for user input, command handling, and AI interactions.
+# Interacts with all components: Processes user inputs, calls agents/commands, queries AI.
 def chat() -> None:
     global MODEL, HISTORY
     display_startup_message()
@@ -668,6 +861,8 @@ def chat() -> None:
                 subcmd = parts[2].lower() if len(parts) > 2 else None
                 if cmd in {"agent", "agents"}:  # Alias agents/agent
                     cmd = "agent"
+                if cmd in {"model", "models"}:  # Alias models/model
+                    cmd = "model"
                 if cmd in COMMAND_HELP:
                     data = COMMAND_HELP[cmd]
                     if cmd == "agent" and subcmd is None:
@@ -695,6 +890,22 @@ def chat() -> None:
                                     console.print(f"  {ex}")
                         else:
                             console.print(f"[red]No such agent: {subcmd}. Supported: {', '.join(SUPPORTED_AGENTS.keys())}[/]")
+                    elif cmd == "model":
+                        # Show detailed model help table
+                        t = Table(title="Grok CLI Models")
+                        t.add_column("Model", style="cyan")
+                        t.add_column("Shorthand(s)")
+                        t.add_column("Description")
+                        t.add_column("Context")
+                        t.add_column("Input Cost")
+                        t.add_column("Output Cost")
+                        for m in MODEL_DETAILS:
+                            t.add_row(m["model"], m["shorthands"], m["desc"], m["context"], m["input_cost"], m["output_cost"])
+                        console.print(t)
+                        console.print("[dim]Switch via 'model <name or shorthand>'. Costs in USD/1M tokens.[/]")
+                        console.print("[dim]Examples: model code → grok-code-fast-1 for dev; model best → Premium for complex queries.[/]")
+                        console.print("[dim]Tip: Use low-cost for everyday; high for deep analysis.[/]")
+                        console.print("[dim]For latest pricing/details, see docs.x.ai/docs/models or console.x.ai/models.[/]")
                     else:
                         console.print(f"[bold cyan]help {cmd}[/]")
                         console.print(data["desc"])
@@ -740,6 +951,12 @@ def chat() -> None:
                     elif name == "test":
                         AGENTS["test"] = TestAgent("test")
                         console.print("[green]TestAgent added → `test generate` or `agent call test …`[/]")
+                    elif name == "debug":
+                        AGENTS["debug"] = DebugAgent("debug")
+                        console.print("[green]DebugAgent added → `debug run main.py` or `agent call debug …`[/]")
+                    elif name == "refactor":
+                        AGENTS["refactor"] = RefactorAgent("refactor")
+                        console.print("[green]RefactorAgent added → `refactor analyze .` or `agent call refactor …`[/]")
                     else:
                         console.print(f"[red]Supported agents: {', '.join(SUPPORTED_AGENTS.keys())}[/]")
 
@@ -783,9 +1000,30 @@ def chat() -> None:
                 AGENTS["test"].handle_command(user.split(maxsplit=1)[1])
                 continue
 
+            # --- Debug shortcut ---
+            if user.lower().startswith("debug ") and "debug" in AGENTS:
+                AGENTS["debug"].handle_command(user.split(maxsplit=1)[1])
+                continue
+
+            # --- Refactor shortcut ---
+            if user.lower().startswith("refactor ") and "refactor" in AGENTS:
+                AGENTS["refactor"].handle_command(user.split(maxsplit=1)[1])
+                continue
+
             # --- Model switch ---
-            if user.lower() in {"model fast", "model best"}:
-                MODEL = "grok-code-fast-1" if "fast" in user else "grok-4"
+            if user.lower().startswith("model "):
+                parts = user.split(maxsplit=1)
+                if len(parts) < 2:
+                    console.print("[red]Usage: model <name or shorthand> (try 'help models' for options)[/]")
+                    continue
+                selection = parts[1].lower()
+                if selection in MODEL_MAP:
+                    MODEL = MODEL_MAP[selection]
+                elif selection in [m["model"] for m in MODEL_DETAILS]:
+                    MODEL = selection
+                else:
+                    console.print("[red]Unknown model. Try 'help models' for options.[/]")
+                    continue
                 console.print(f"[green]Model → {MODEL}[/]")
                 continue
 
@@ -840,8 +1078,8 @@ def chat() -> None:
                 if not structure:
                     console.print("[red]Scan failed.[/]")
                     continue
-                prompt = f"Generate Dockerfile and docker-compose.yml for this project. Structure:\n{structure}\nOutput as artifacts: ```artifact Dockerfile\n<content>\n``` and ```artifact docker-compose.yml\n<content>\n```"
-                reply = _query_ai(prompt, "dockerize")
+                ai_prompt = f"Generate Dockerfile and docker-compose.yml for this project. Structure:\n{structure}\nOutput as artifacts: ```artifact Dockerfile\n<content>\n``` and ```artifact docker-compose.yml\n<content>\n```"
+                reply = _query_ai(ai_prompt, "dockerize")
                 if ask("Build image? (y/n)", default="y") == "y":
                     if run_command("docker build -t grok-project ."):
                         console.print("[green]Image built.[/]")
