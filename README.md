@@ -14,9 +14,9 @@
     ███                  ███           ███        ███   ███     ███      ███  ███   ███   
     █████              █████            ████████████    ███      ████  ████   ███    ███  
     ███              █████                 ███████      ███        ██████     ███      ███
-   ██     ███████████████                  C O M M A N D   L I N E   I N T E R F A C E
+   ██     ███████████████                  𝘾 𝙊 𝙈 𝙈 𝘼 𝙉 𝘿    𝙇 𝙄 𝙉 𝙀    𝙄 𝙉 𝙏 𝙀 𝙍 𝙁 𝘼 𝘾 𝙀
   █        ███████████                                                                    
-█                                          get lastest version on GitHub @siriusbontea
+█                                               𝘨𝘦𝘵 𝘭𝘢𝘴𝘵𝘦𝘴𝘵 𝘷𝘦𝘳𝘴𝘪𝘰𝘯 𝘰𝘯 𝘎𝘪𝘵𝘏𝘶𝘣 @𝘴𝘪𝘳𝘪𝘶𝘴𝘣𝘰𝘯𝘵𝘦𝘢
 
 ```
 Grok CLI is a powerful, terminal-based AI assistant powered by xAI's Grok models (Grok-4 and Grok-Code-Fast-1). It's designed as a **universal tool for everyday AI interactions**—from answering general questions, brainstorming ideas, or managing tasks—to serving as a **highly capable coding assistant** for developers. Whether you're a non-technical user chatting with AI for fun or advice, or a programmer automating workflows, Grok CLI makes advanced AI feel intuitive and accessible right from your command line.
@@ -26,7 +26,9 @@ Unlike traditional tools, Grok CLI emphasizes safety, discoverability, and minim
 ## Features
 Grok CLI bridges general AI assistance with specialized dev tools, all in one lightweight interface:
 
+- **Seamless file operations**: Read, write, create, and manage files directly in your project (surpassing Grok Studio's read-only limitations).
 - **General-Purpose AI Chat**: Ask anything—from "What's the weather like?" (via tools) to creative writing or problem-solving. Responses are helpful, concise, and context-aware.
+- **Multiple Grok Models**: Switch between optimized models like grok-code-fast-1 (fast code gen), grok-4-fast-reasoning (balanced speed), grok-4-fast-non-reasoning (ultra-fast simple tasks), and grok-4-0709 (premium reasoning).
 - **Coding Assistance**: Generate code snippets, debug issues, or get explanations. Save, run, test, and commit code with interactive prompts.
 - **Project Management**: Handle files/directories (cd, ls, mkdir), virtual environments (venv), packages (pip), and Git ops—all restricted to your project folder for safety.
 - **Automation Agents**: Modular "agents" for tasks like file scanning (fs), Git (git), linting (lint), README generation (readme), and testing (test). AI can call them automatically.
@@ -141,7 +143,7 @@ If you're new to terminals or AI tools:
 
 ## Commands
 Type `help` in the CLI for a full table. Highlights:
-- **AI/Model**: `model fast/best` (switch models), `review` (code review).
+- **AI/Model**: `model <shorthand>` (e.g., `model code` for grok-code-fast-1, `model best` for grok-4-0709; try `help models` for details), `review` (code review).
 - **Navigation/Files**: `cd [path]`, `ls`, `mkdir [dir]`, `touch [file]`, `rm [path]` (confirms delete).
 - **Python Tools**: `venv create/activate`, `pip install [pkg]`, `run [file.py]`, `requirements generate`.
 - **Dev Automation**: `preview` (start web server), `dockerize` (generate/build Docker), `test generate [file]` or `test run`.
@@ -157,6 +159,7 @@ Tab to auto-complete commands/paths. For details: `help <cmd>` (e.g., `help agen
 - **Troubleshooting**: API issues? Check `XAI_KEY`. Dependency missing? Grok CLI prompts installs.
 - **For Coders**: Chain actions—e.g., generate code, save/run/test/commit in one flow.
 - **General Use**: Beyond code, use for research, planning, or fun—e.g., "Plan a trip to Tokyo."
+- **Permissions Tip**: For file ops (e.g., mkdir, save artifacts), ensure your project directory has write permissions (e.g., `chmod 755 myproject` for owner-write, all-read/execute). CLI restricts to startup dir for safety.
 
 ## Contributing
 Fork on GitHub, make improvements, and PR! Focus on lightweight, user-first features. Report issues via GitHub.
