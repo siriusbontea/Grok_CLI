@@ -165,35 +165,3 @@ Fork on GitHub, make improvements, and PR! Focus on lightweight, user-first feat
 BSD 3-Clause License. Copyright (c) 2025, Sirius T. Bontea. See [LICENSE](LICENSE) for details.
 
 Questions? Launch Grok CLI and ask it directly!
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-## Contributing
-Feel free to fork and PR improvements! Focus on keeping it lightweight and user-friendly.
-
-## License
-Licensed under BSD-3-Clause. Built with ❤️ by Sirius T. Bontea using xAI's Grok.
-
-For questions, chat with Grok in the CLI itself!
