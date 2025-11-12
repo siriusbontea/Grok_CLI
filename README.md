@@ -1,4 +1,4 @@
-# Grok CLI: Interactive Coding Assistant
+# Grok CLI: Your Universal AI Terminal
 ```
                                 █                                                         
                               █                                                           
@@ -19,107 +19,176 @@
 █                                          get lastest version on GitHub @siriusbontea
 
 ```
-Grok CLI is a terminal-based interactive coding assistant powered by xAI's Grok models (Grok-4 and Grok-Code-Fast-1). It allows you to chat with the AI for coding advice, generate and save code, manage Python projects, and automate development tasks like virtual environments, Git operations, Docker setup, and more—all from a single CLI interface.
+Grok CLI is a powerful, terminal-based AI assistant powered by xAI's Grok models (Grok-4 and Grok-Code-Fast-1). It's designed as a **universal tool for everyday AI interactions**—from answering general questions, brainstorming ideas, or managing tasks—to serving as a **highly capable coding assistant** for developers. Whether you're a non-technical user chatting with AI for fun or advice, or a programmer automating workflows, Grok CLI makes advanced AI feel intuitive and accessible right from your command line.
 
-Designed for developers, it provides a seamless workflow for prototyping, debugging, and building projects with minimal context switching. The CLI is self-contained, with built-in commands for file/directory management, code execution, and AI interactions.
+Unlike traditional tools, Grok CLI emphasizes safety, discoverability, and minimal setup. It's POSIX-compliant, running seamlessly on systems like FreeBSD, Linux, and macOS. For Windows users, it's easy to replicate via WSL (see below). No web browser needed—just your terminal.
 
 ## Features
-- **AI-Powered Coding Assistance**: Chat with Grok to generate code, get explanations, or debug issues. Code blocks in responses can be saved, executed, tested, and committed automatically.
-- **Project Management**: Create virtual environments, install packages, generate requirements.txt, initialize Git repos, and perform basic Git operations.
-- **File and Directory Tools**: Shell-like commands (cd, ls, mkdir, touch, rm, mv, cp) restricted to the project directory for safety.
-- **Dev Automation**: Preview web apps (FastAPI/Flask), dockerize projects, perform AI code reviews, run tests, and more.
-- **Conversation Management**: Clear history or view summaries to keep sessions organized.
-- **Tab Completion**: Intelligent auto-completion for commands and paths.
-- **Context Awareness**: Displays context usage percentage to monitor AI conversation limits.
-- **Safety Features**: Directory navigation is limited to the starting project folder and its subdirectories to prevent accidental system changes.
+Grok CLI bridges general AI assistance with specialized dev tools, all in one lightweight interface:
+
+- **General-Purpose AI Chat**: Ask anything—from "What's the weather like?" (via tools) to creative writing or problem-solving. Responses are helpful, concise, and context-aware.
+- **Coding Assistance**: Generate code snippets, debug issues, or get explanations. Save, run, test, and commit code with interactive prompts.
+- **Project Management**: Handle files/directories (cd, ls, mkdir), virtual environments (venv), packages (pip), and Git ops—all restricted to your project folder for safety.
+- **Automation Agents**: Modular "agents" for tasks like file scanning (fs), Git (git), linting (lint), README generation (readme), and testing (test). AI can call them automatically.
+- **Dev Shortcuts**: Preview web apps (FastAPI/Flask), dockerize projects, run Python files, generate requirements.txt, and more.
+- **User-Friendly Design**: Tab completion, rich help docs, context usage indicators, and confirmations for destructive actions. Forgiving for beginners—e.g., auto-install prompts for tools like pytest.
+- **Security & Privacy**: Operations limited to your starting directory. No unintended system changes.
 
 ## Prerequisites
-- Python 3.8+ (tested on 3.12)
-- An xAI API key (sign up at [x.ai](https://x.ai) if needed)
+- **Python**: Version 3.8+ (tested up to 3.12). Most modern systems have this pre-installed.
+- **xAI API Key**: Sign up at [x.ai](https://x.ai) and get your key. (Free tier available for basic use.)
+- **Optional for Full Features**: Libraries like `pytest`, `uvicorn`, or `docker`—Grok CLI prompts to install them as needed.
 
 ## Installation
+Grok CLI is a single Python script—no complex setup required. Here's how to get started:
+
 1. **Download the Script**:
-   - Clone the repository or download the `grok` script (it's a single Python file).
-`
-git clone <repo-url>  # If in a repo
+   - Clone the repo or download `grok_cli.py` directly from GitHub.
+
+```
+git clone https://github.com/siriusbontea/grok-cli.git
 cd grok-cli
-`
+```
+
+- (Or just wget/curl the file if you prefer.)
 
 2. **Install Dependencies**:
-- The CLI requires a few Python libraries. Install them via pip:
-`
+- Run in your terminal:
+
+```
 pip install rich openai prompt-toolkit
-`
-- Optional for full functionality (e.g., testing, web previews):
-`
+```
+
+- These handle formatting, AI calls, and input—lightweight and essential.
+- For extras (e.g., testing or web previews):
+
+```
 pip install pytest uvicorn fastapi flask docker
-`
-Note: Some features like `pytest` or `uvicorn` may require additional installs based on your project.
+```
+
+Grok CLI will guide you if something's missing.
 
 3. **Set Up API Key**:
-- Export your xAI API key as an environment variable:
-`
-export XAI_KEY="your_xai_api_key_here"
-`
-(Add this to your shell profile like `~/.bashrc` or `~/.zshrc` for persistence.)
+- Export your xAI key:
 
-4. **Make the Script Executable** (Optional):
-- For easier running:
-`
-chmod +x grok
-`
+```
+export XAI_KEY="your_xai_api_key_here"
+```
+
+- Add to your shell profile (e.g., `~/.bashrc`, `~/.zshrc`) for persistence:
+
+```
+echo 'export XAI_KEY="your_xai_api_key_here"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+4. **Make Executable (Optional)**:
+- For easy running:
+
+```
+chmod +x grok_cli.py
+```
+
+- Now launch with `./grok_cli.py` or `python grok_cli.py`.
+
+## Platform Compatibility
+Grok CLI is fully POSIX-compliant, ensuring smooth operation on Unix-like systems:
+- **FreeBSD, Linux, macOS**: Runs natively in your terminal—no extras needed. Just open Terminal.app (macOS), GNOME Terminal (Linux), or similar.
+
+For **Windows Users**:
+- Use Windows Subsystem for Linux (WSL) to replicate a POSIX environment:
+1. Install WSL via Microsoft Store (search for "Ubuntu" or your preferred distro).
+2. Launch WSL terminal.
+3. Follow the installation steps above inside WSL.
+- This gives you full Grok CLI power without native Windows quirks. (Direct Windows support planned for future versions.)
 
 ## Quick Start
-1. Run the CLI:
-`
-./grok  # Or python grok
-`
-- On launch, you'll see an ASCII logo, a list of available commands, and a prompt to type `help` for details.
-- The prompt shows context usage (e.g., (@ 0%) ~ ❯) and current directory.
+Launch Grok CLI:
 
-2. **Basic Usage**:
-- Type any query to chat with Grok (e.g., "Write a Python function to reverse a string").
-- Use commands for actions (e.g., `mkdir src`, `cd src`, `git init`).
-- For code generation: If Grok responds with a code block, you'll be prompted to save, run, test, or commit it.
-- Exit with `quit` or `exit` (or Ctrl+C).
+```
+./grok_cli.py  # Or python grok_cli.py
+```
 
-Example session:
+- You'll see the ASCII logo and a prompt like `(@ 0%) ~ ❯`.
+- **General Query Example**: Type "Tell me a joke about AI." → Grok responds conversationally.
+- **Coding Example**:
+
 ```
 (@ 0%) ~ ❯ mkdir myproject
-Created directory: myproject
+Created: /path/to/myproject
 (@ 0%) ~ ❯ cd myproject
-Changed to: /path/to/myproject
+Changed to: ~/myproject
 (@ 0%) ~ ❯ venv create
 Virtual environment created in .venv
-(@ 0%) ~ ❯ Write a hello world script
+(@ 0%) ~ ❯ Write a simple Python script to print 'Hello, World!'
 [Grok's response with code block]
 Save python? (y/n/[filename]): y
 Saved: hello.py
-Run now? (y): y
+Run now? (y/n): y
 Hello, World!
-Git commit? (y): y
-[Git commit output]
+Git commit? (y/n): y
+[Git output]
 ```
 
+- Exit: `quit`, `exit`, or Ctrl+C.
+
+### Getting Started for Non-Developers
+If you're new to terminals or AI tools:
+- Start with `help` to see all commands in a table.
+- Try simple chats: "Explain quantum computing like I'm 5."
+- Use agents for tasks: `agent add fs` then `fs scan` to view your folder structure.
+- Everything is safe—Grok CLI can't access outside your project folder, and it asks before changes.
 
 ## Commands
-The CLI starts with a summary of commands. Type `help` for a detailed table. Here's an overview:
+Type `help` in the CLI for a full table. Highlights:
+- **AI/Model**: `model fast/best` (switch models), `review` (code review).
+- **Navigation/Files**: `cd [path]`, `ls`, `mkdir [dir]`, `touch [file]`, `rm [path]` (confirms delete).
+- **Python Tools**: `venv create/activate`, `pip install [pkg]`, `run [file.py]`, `requirements generate`.
+- **Dev Automation**: `preview` (start web server), `dockerize` (generate/build Docker), `test generate [file]` or `test run`.
+- **Agents**: `agent list/add/help/call`—e.g., `readme generate` for auto-README.
+- **Session**: `clear` (reset chat), `history` (view summary).
 
-- **AI/Model**: `model fast/best` (switch models), `review` (code review), `preview` (start web server), `dockerize` (generate Docker files).
-- **Navigation/File Management**: `cd [path]` (change dir, restricted to project), `ls` (list files), `mkdir [dir]`, `touch [file]`, `rm [path]` (with confirm), `mv [src] [dst]`, `cp [src] [dst]`.
-- **Python/Venv**: `venv create/activate`, `pip install [pkg]`, `requirements generate`, `run [file.py]`, `test` (run or generate tests).
-- **Git**: `git init/status/add [file]/push`.
-- **Session**: `clear` (reset history), `history` (view summary), `debug model` (show info), `quit/exit`.
-- **General Queries**: Anything else is sent to Grok for AI response.
-
-Tab completion works for commands and paths—press Tab to auto-complete.
+Tab to auto-complete commands/paths. For details: `help <cmd>` (e.g., `help agent` shows agents with examples).
 
 ## Tips for New Users
-- **Onboarding**: The startup screen lists commands; `help` expands them. Start with simple queries or commands—no prior setup needed beyond the API key.
-- **Code Handling**: Grok outputs code in fenced blocks. You'll get interactive prompts to save/run/test/commit—answer y/n or provide filenames.
-- **Safety**: Can't `cd` outside the launch directory. Destructive commands like `rm` require confirmation.
-- **Customization**: Edit the system prompt in the script if needed (in `HISTORY`).
-- **Troubleshooting**: If API calls fail, check `XAI_KEY`. For dependency issues, ensure libraries are installed. Use `debug model` to inspect setup.
+- **Discoverability**: Stuck? Type `help` or partial commands + Tab.
+- **Safety Net**: Destructive actions (e.g., rm) always confirm. Ops stay in your project.
+- **Customization**: Edit `grok_cli.py`'s system prompt for tweaks.
+- **Troubleshooting**: API issues? Check `XAI_KEY`. Dependency missing? Grok CLI prompts installs.
+- **For Coders**: Chain actions—e.g., generate code, save/run/test/commit in one flow.
+- **General Use**: Beyond code, use for research, planning, or fun—e.g., "Plan a trip to Tokyo."
+
+## Contributing
+Fork on GitHub, make improvements, and PR! Focus on lightweight, user-first features. Report issues via GitHub.
+
+## License
+BSD 3-Clause License. Copyright (c) 2025, Sirius T. Bontea. See [LICENSE](LICENSE) for details.
+
+Questions? Launch Grok CLI and ask it directly!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ## Contributing
 Feel free to fork and PR improvements! Focus on keeping it lightweight and user-friendly.
