@@ -154,7 +154,27 @@ grok> /n    # Disable auto-confirm
 
 ## Configuration
 
-Default config created at `~/.grok/config.toml`:
+### Storage Locations
+
+**Global (user preferences):** `~/.grok/`
+```
+~/.grok/
+├── config.toml     # User configuration
+├── plugins/        # Custom plugins
+└── cache/          # API response cache
+```
+
+**Project-local (per-project data):** `.grok/` in your project directory
+```
+your-project/.grok/
+├── sessions/       # Saved conversations (.toon files)
+├── history         # Command history
+└── context.toon    # Current session context
+```
+
+### Config File
+
+Default config at `~/.grok/config.toml`:
 
 ```toml
 default_model = "grok41_fast"

@@ -112,14 +112,21 @@ web_daily_quota = 100000     # tokens via web plugin
 
 ## Directory Structure
 
+**Global (shared across projects):**
 ```
 ~/.grok/
-├── config.toml              # Configuration
+├── config.toml              # User configuration
 ├── cache/<sha256>.json      # API response cache
-├── sessions/
-│   ├── 2025-11-22T14:30.toon
-│   └── current → symlink    # Current session
 └── plugins/*.py             # Custom plugins
+```
+
+**Project-local (per-project, visible in your project directory):**
+```
+your-project/.grok/
+├── sessions/                # Saved conversations
+│   └── *.toon               # TOON format session files
+├── history                  # Command history
+└── context.toon             # Current session context
 ```
 
 ## Troubleshooting

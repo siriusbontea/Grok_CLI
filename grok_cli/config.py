@@ -1,7 +1,11 @@
 """Configuration management using TOML format.
 
-TOML is used for all user-editable configuration (supports comments and hierarchy).
-Default config is created on first run at ~/.grok/config.toml
+Storage locations:
+- Global config: ~/.grok/config.toml (user preferences, plugins)
+- Project data: .grok/ in launch directory (sessions, history, context)
+
+This separation allows per-project conversation history while sharing
+user preferences across all projects.
 """
 
 import os
@@ -23,9 +27,31 @@ DEFAULT_CONFIG = {
     "web_daily_quota": 100000,  # tokens via web plugin, 0 = disabled
 }
 
+# Store the launch directory (set by sandbox.init_sandbox)
+_launch_dir: Path | None = None
+
+
+def set_launch_dir(path: Path) -> None:
+    """Set the launch directory (called by sandbox.init_sandbox).
+
+    Args:
+        path: The directory where grok was launched
+    """
+    global _launch_dir
+    _launch_dir = path
+
+
+def get_launch_dir() -> Path:
+    """Get the launch directory.
+
+    Returns:
+        Path to launch directory (defaults to cwd if not set)
+    """
+    return _launch_dir or Path.cwd()
+
 
 def get_grok_dir() -> Path:
-    """Get the ~/.grok directory, creating it if it doesn't exist.
+    """Get the global ~/.grok directory for user config, plugins, and cache.
 
     Returns:
         Path to ~/.grok directory
@@ -33,12 +59,31 @@ def get_grok_dir() -> Path:
     grok_dir = Path.home() / ".grok"
     grok_dir.mkdir(exist_ok=True)
 
-    # Create subdirectories
-    (grok_dir / "cache").mkdir(exist_ok=True)
-    (grok_dir / "sessions").mkdir(exist_ok=True)
+    # Global subdirectories
     (grok_dir / "plugins").mkdir(exist_ok=True)
+    (grok_dir / "cache").mkdir(exist_ok=True)
 
     return grok_dir
+
+
+def get_project_dir() -> Path:
+    """Get the project-local .grok directory for sessions and context.
+
+    This directory is created in the launch directory and stores:
+    - sessions/ - Saved conversations
+    - context.toon - Current session context
+    - history - Command history
+
+    Returns:
+        Path to .grok directory in project
+    """
+    project_dir = get_launch_dir() / ".grok"
+    project_dir.mkdir(exist_ok=True)
+
+    # Create subdirectories
+    (project_dir / "sessions").mkdir(exist_ok=True)
+
+    return project_dir
 
 
 def get_config_path() -> Path:

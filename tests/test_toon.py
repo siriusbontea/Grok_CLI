@@ -72,9 +72,7 @@ def test_round_trip():
 
 def test_round_trip_multiline():
     """Test round-trip with multi-line values."""
-    original = {
-        "code": "def foo():\n    return 42"
-    }
+    original = {"code": "def foo():\n    return 42"}
     serialized = serialize_toon(original)
     parsed = parse_toon(serialized)
     assert parsed == original

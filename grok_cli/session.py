@@ -262,7 +262,7 @@ def compress_session(data: dict[str, Any], mode: str = "smart") -> dict[str, Any
 
 
 def save_session(data: dict[str, Any], compress_mode: str = "smart") -> Path:
-    """Save session to ~/.grok/sessions/ with current symlink.
+    """Save session to project's .grok/sessions/ with current symlink.
 
     Args:
         data: Session data dictionary
@@ -274,7 +274,7 @@ def save_session(data: dict[str, Any], compress_mode: str = "smart") -> Path:
     from datetime import datetime
     from grok_cli import config
 
-    sessions_dir = config.get_grok_dir() / "sessions"
+    sessions_dir = config.get_project_dir() / "sessions"
     sessions_dir.mkdir(exist_ok=True)
 
     # Compress if needed
@@ -310,7 +310,7 @@ def load_session(session_path: Path | None = None) -> dict[str, Any]:
     """
     from grok_cli import config
 
-    sessions_dir = config.get_grok_dir() / "sessions"
+    sessions_dir = config.get_project_dir() / "sessions"
 
     if session_path is None:
         # Load current session
@@ -329,14 +329,14 @@ def load_session(session_path: Path | None = None) -> dict[str, Any]:
 
 
 def list_sessions() -> list[Path]:
-    """List all saved sessions.
+    """List all saved sessions in the project's .grok/sessions/ directory.
 
     Returns:
         List of session file paths, sorted by modification time (newest first)
     """
     from grok_cli import config
 
-    sessions_dir = config.get_grok_dir() / "sessions"
+    sessions_dir = config.get_project_dir() / "sessions"
     sessions_dir.mkdir(exist_ok=True)
 
     # Get all .toon files
@@ -346,3 +346,54 @@ def list_sessions() -> list[Path]:
     sessions.sort(key=lambda p: p.stat().st_mtime, reverse=True)
 
     return sessions
+
+
+def messages_to_toon(messages: list[dict[str, Any]]) -> str:
+    """Convert conversation messages to TOON format for saving.
+
+    Args:
+        messages: List of message dicts with 'role' and 'content'
+
+    Returns:
+        TOON formatted string
+    """
+    data: dict[str, str | list[str] | None] = {}
+
+    for i, msg in enumerate(messages):
+        role = msg.get("role", "unknown")
+        content = msg.get("content", "")
+
+        # Use turn_N_role format
+        key = f"turn_{i:03d}_{role}"
+        data[key] = content
+
+    return serialize_toon(data)
+
+
+def toon_to_messages(toon_text: str) -> list[dict[str, Any]]:
+    """Convert TOON format back to conversation messages.
+
+    Args:
+        toon_text: TOON formatted string
+
+    Returns:
+        List of message dicts with 'role' and 'content'
+    """
+    data = parse_toon(toon_text)
+    messages: list[dict[str, Any]] = []
+
+    # Sort keys to ensure proper order
+    turn_keys = sorted([k for k in data.keys() if k.startswith("turn_")])
+
+    for key in turn_keys:
+        # Parse key format: turn_NNN_role
+        parts = key.split("_", 2)
+        if len(parts) >= 3:
+            role = parts[2]  # user or assistant
+            content = data[key]
+            # Ensure content is always a string (parse_toon may return list for comma-separated)
+            if isinstance(content, list):
+                content = ", ".join(content)
+            messages.append({"role": role, "content": str(content)})
+
+    return messages

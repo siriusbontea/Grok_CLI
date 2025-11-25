@@ -4,6 +4,9 @@ Slash commands provide utility functions that don't require
 model interaction (e.g., /help, /model, /cost).
 """
 
+import subprocess
+import sys
+from datetime import datetime
 from typing import Any, Callable
 
 from rich.console import Console
@@ -16,6 +19,50 @@ from grok_cli.plugins import discover_plugins, get_registered_commands, get_regi
 from grok_cli import sandbox
 
 console = Console()
+
+# Color themes
+COLOR_THEMES = {
+    "default": {
+        "prompt-box": "#888888",
+        "prompt-name": "#00ffff bold",
+        "prompt-model": "#ffff00",
+        "prompt-cwd": "#00ff00",
+        "prompt-git": "#ff00ff",
+        "prompt-git-status": "#ff0000 bold",
+    },
+    "ocean": {
+        "prompt-box": "#4a6fa5",
+        "prompt-name": "#00bfff bold",
+        "prompt-model": "#87ceeb",
+        "prompt-cwd": "#20b2aa",
+        "prompt-git": "#9370db",
+        "prompt-git-status": "#ff6347 bold",
+    },
+    "forest": {
+        "prompt-box": "#556b2f",
+        "prompt-name": "#32cd32 bold",
+        "prompt-model": "#9acd32",
+        "prompt-cwd": "#228b22",
+        "prompt-git": "#daa520",
+        "prompt-git-status": "#ff4500 bold",
+    },
+    "sunset": {
+        "prompt-box": "#cd853f",
+        "prompt-name": "#ff6347 bold",
+        "prompt-model": "#ffa500",
+        "prompt-cwd": "#ff8c00",
+        "prompt-git": "#da70d6",
+        "prompt-git-status": "#dc143c bold",
+    },
+    "minimal": {
+        "prompt-box": "#666666",
+        "prompt-name": "#ffffff bold",
+        "prompt-model": "#aaaaaa",
+        "prompt-cwd": "#888888",
+        "prompt-git": "#999999",
+        "prompt-git-status": "#cccccc bold",
+    },
+}
 
 # Registry of slash commands
 SLASH_COMMANDS: dict[str, tuple[Callable[..., Any], str, str]] = {}
@@ -177,16 +224,31 @@ def cmd_help(args: list[str], cfg: dict[str, Any], agent: Any) -> None:
   /model <name>     Switch to a different model
   /models           List available models
   /cost             Show token usage dashboard
-  /clear            Clear conversation history
+  /clear [-f]       Clear history (asks for confirmation, -f to force)
   /history          Show conversation history
   /y, /yes          Enable auto-confirm (skip file operation prompts)
   /n, /no           Disable auto-confirm (require prompts)
+  /copy             Copy last response to clipboard
+  /compact          Toggle compact mode (hide/show stats)
+  /save [name]      Save snapshot to .grok/sessions/
+  /resume [name]    Load a saved snapshot
+  /theme [name]     Set color theme (default, ocean, forest, sunset, minimal)
   /plugins          List loaded plugins
   /pwd              Show current directory
   /exit, /quit      Exit the REPL
 
+[bold]Auto-Save:[/bold]
+  Your conversation is automatically saved to .grok/context.toon
+  and restored when you restart. Use /clear to start fresh.
+
 [bold]Shell Commands:[/bold]
   ls, ll, cd, pwd, cat, head, tail, mkdir, tree, cp, mv, rm
+
+[bold]Keyboard Shortcuts:[/bold]
+  Ctrl+L            Clear screen
+  Ctrl+R            Reverse history search
+  Tab               Auto-complete commands and file paths
+  ↑/↓               Navigate command history
 
 [bold]File Operations:[/bold]
   The assistant confirms before writing/editing files.
@@ -266,10 +328,45 @@ def cmd_cost(args: list[str], cfg: dict[str, Any], agent: Any) -> None:
 
 
 def cmd_clear(args: list[str], cfg: dict[str, Any], agent: Any) -> None:
-    """Clear conversation history."""
-    if agent:
-        agent.clear_history()
-    console.print("[green]✓[/green] Conversation history cleared")
+    """Clear conversation history with confirmation."""
+    if not agent:
+        console.print("[yellow]No active session[/yellow]")
+        return
+
+    # Check if there's anything to clear
+    msg_count = len(agent.messages) if agent.messages else 0
+    has_context = agent.has_saved_context()
+
+    if msg_count == 0 and not has_context:
+        console.print("[dim]Nothing to clear[/dim]")
+        return
+
+    # Support -f or --force flag to skip confirmation
+    if args and args[0] in ("-f", "--force"):
+        agent.clear_history(delete_context_file=True)
+        console.print("[green]✓[/green] Conversation history cleared")
+        return
+
+    # Show warning about what will be deleted
+    console.print("\n[yellow]Warning:[/yellow] This will permanently delete:")
+    if msg_count > 0:
+        console.print(f"  • Current conversation ({msg_count} messages)")
+    if has_context:
+        context_path = config.get_project_dir() / "context.toon"
+        console.print(f"  • Saved context file ({context_path})")
+
+    console.print()
+
+    # Ask for confirmation
+    try:
+        response = console.input("[bold]Are you sure? (y/N):[/bold] ")
+        if response.lower() in ("y", "yes"):
+            agent.clear_history(delete_context_file=True)
+            console.print("[green]✓[/green] Conversation history cleared")
+        else:
+            console.print("[dim]Cancelled[/dim]")
+    except (KeyboardInterrupt, EOFError):
+        console.print("\n[dim]Cancelled[/dim]")
 
 
 def cmd_history(args: list[str], cfg: dict[str, Any], agent: Any) -> None:
@@ -342,6 +439,182 @@ def cmd_pwd(args: list[str], cfg: dict[str, Any], agent: Any) -> None:
         console.print(f"[dim]Launch:  {launch}[/dim]")
 
 
+def cmd_copy(args: list[str], cfg: dict[str, Any], agent: Any) -> None:
+    """Copy last response to clipboard."""
+    if not agent or not agent.get_last_response():
+        console.print("[yellow]No response to copy[/yellow]")
+        return
+
+    response = agent.get_last_response()
+
+    # Try to copy to clipboard using platform-specific commands
+    try:
+        if sys.platform == "darwin":
+            # macOS
+            process = subprocess.Popen(["pbcopy"], stdin=subprocess.PIPE)
+            process.communicate(response.encode("utf-8"))
+        elif sys.platform == "win32":
+            # Windows
+            process = subprocess.Popen(["clip"], stdin=subprocess.PIPE)
+            process.communicate(response.encode("utf-8"))
+        else:
+            # Linux (requires xclip or xsel)
+            try:
+                process = subprocess.Popen(["xclip", "-selection", "clipboard"], stdin=subprocess.PIPE)
+                process.communicate(response.encode("utf-8"))
+            except FileNotFoundError:
+                process = subprocess.Popen(["xsel", "--clipboard", "--input"], stdin=subprocess.PIPE)
+                process.communicate(response.encode("utf-8"))
+
+        console.print(f"[green]✓[/green] Copied {len(response)} characters to clipboard")
+    except Exception as e:
+        console.print(f"[red]Error:[/red] Could not copy to clipboard: {e}")
+        console.print("[dim]On Linux, install xclip or xsel[/dim]")
+
+
+def cmd_compact(args: list[str], cfg: dict[str, Any], agent: Any) -> None:
+    """Toggle compact mode (hide/show stats)."""
+    if not agent:
+        return
+
+    # Toggle mode
+    current = getattr(agent, "compact_mode", False)
+    agent.set_compact_mode(not current)
+
+    if agent.compact_mode:
+        console.print("[green]✓[/green] Compact mode enabled (stats hidden)")
+    else:
+        console.print("[green]✓[/green] Compact mode disabled (stats shown)")
+
+
+def cmd_save(args: list[str], cfg: dict[str, Any], agent: Any) -> None:
+    """Save current conversation to a session file in .grok/sessions/."""
+    if not agent or not agent.messages:
+        console.print("[yellow]No conversation to save[/yellow]")
+        return
+
+    # Generate filename with timestamp
+    timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
+    name = args[0] if args else timestamp
+    filename = f"{name}.toon"
+
+    # Get project-local sessions directory
+    sessions_dir = config.get_project_dir() / "sessions"
+    sessions_dir.mkdir(parents=True, exist_ok=True)
+    filepath = sessions_dir / filename
+
+    # Convert messages to TOON format
+    toon_content = session.messages_to_toon(agent.messages)
+
+    # Save file
+    filepath.write_text(toon_content)
+
+    # Show transparent output
+    console.print(f"\n[green]✓[/green] Session saved ({len(agent.messages)} messages)")
+    console.print(f"[dim]Location: {filepath}[/dim]")
+    console.print(f"[dim]Size: {len(toon_content)} bytes[/dim]\n")
+
+
+def cmd_resume(args: list[str], cfg: dict[str, Any], agent: Any) -> None:
+    """Resume a saved conversation from .grok/sessions/."""
+    sessions_dir = config.get_project_dir() / "sessions"
+
+    if not sessions_dir.exists():
+        console.print("[yellow]No saved sessions found in this project[/yellow]")
+        console.print(f"[dim]Looking in: {sessions_dir}[/dim]")
+        return
+
+    # List available sessions
+    session_files = sorted(sessions_dir.glob("*.toon"), key=lambda p: p.stat().st_mtime, reverse=True)
+
+    if not session_files:
+        console.print("[yellow]No saved sessions found in this project[/yellow]")
+        console.print(f"[dim]Looking in: {sessions_dir}[/dim]")
+        return
+
+    if args:
+        # Check if arg is a number (index)
+        name = args[0]
+        if name.isdigit():
+            idx = int(name) - 1
+            if 0 <= idx < len(session_files):
+                filepath = session_files[idx]
+            else:
+                console.print(f"[red]Invalid session number:[/red] {name}")
+                return
+        else:
+            if not name.endswith(".toon"):
+                name += ".toon"
+            filepath = sessions_dir / name
+
+            if not filepath.exists():
+                console.print(f"[red]Session not found:[/red] {name}")
+                console.print(f"[dim]Looking in: {sessions_dir}[/dim]")
+                return
+    else:
+        # Show list of sessions
+        console.print(f"\n[bold]Saved Sessions[/bold] [dim]({sessions_dir})[/dim]\n")
+
+        table = Table(show_header=True, header_style="bold cyan")
+        table.add_column("#", style="dim")
+        table.add_column("Name")
+        table.add_column("Date", style="dim")
+        table.add_column("Size", style="dim")
+
+        for i, sf in enumerate(session_files[:10], 1):
+            date = datetime.fromtimestamp(sf.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
+            size = f"{sf.stat().st_size / 1024:.1f} KB"
+            table.add_row(str(i), sf.stem, date, size)
+
+        console.print(table)
+        console.print("\n[dim]Usage: /resume <name> or /resume <number>[/dim]\n")
+        return
+
+    # Load the session
+    try:
+        toon_content = filepath.read_text()
+        messages = session.toon_to_messages(toon_content)
+        agent.messages = messages
+        console.print(f"\n[green]✓[/green] Resumed session ({len(messages)} messages)")
+        console.print(f"[dim]Loaded from: {filepath}[/dim]\n")
+    except Exception as e:
+        console.print(f"[red]Error loading session:[/red] {e}")
+
+
+def cmd_theme(args: list[str], cfg: dict[str, Any], agent: Any) -> None:
+    """Set color theme for the prompt."""
+    if not args:
+        # Show available themes
+        console.print("\n[bold]Available Themes:[/bold]\n")
+        current = cfg.get("theme", "default")
+
+        for name in COLOR_THEMES:
+            marker = " ← current" if name == current else ""
+            console.print(f"  [cyan]{name}[/cyan]{marker}")
+
+        console.print("\n[dim]Usage: /theme <name>[/dim]\n")
+        return
+
+    theme_name = args[0].lower()
+
+    if theme_name not in COLOR_THEMES:
+        console.print(f"[red]Unknown theme:[/red] {theme_name}")
+        console.print(f"Available: {', '.join(COLOR_THEMES.keys())}")
+        return
+
+    # Update config
+    cfg["theme"] = theme_name
+    config.save_config(cfg)
+
+    # Update the prompt style
+    from grok_cli.ui import prompt
+
+    prompt.PROMPT_STYLE.update(COLOR_THEMES[theme_name])
+
+    console.print(f"[green]✓[/green] Theme set to: {theme_name}")
+    console.print("[dim]Theme will be applied on next prompt[/dim]")
+
+
 # --- Register Commands ---
 
 register_slash_command("help", cmd_help, "Show help information", "/help [topic]")
@@ -350,7 +623,7 @@ register_slash_command("model", cmd_model, "Switch model", "/model <name>")
 register_slash_command("m", cmd_model, "Switch model (alias)", "/m <name>")
 register_slash_command("models", cmd_models, "List available models", "/models")
 register_slash_command("cost", cmd_cost, "Show token usage", "/cost")
-register_slash_command("clear", cmd_clear, "Clear conversation history", "/clear")
+register_slash_command("clear", cmd_clear, "Clear conversation history (with confirmation)", "/clear [-f]")
 register_slash_command("history", cmd_history, "Show conversation history", "/history")
 register_slash_command("y", cmd_yes, "Enable auto-confirm", "/y")
 register_slash_command("yes", cmd_yes, "Enable auto-confirm", "/yes")
@@ -358,3 +631,8 @@ register_slash_command("n", cmd_no, "Disable auto-confirm", "/n")
 register_slash_command("no", cmd_no, "Disable auto-confirm", "/no")
 register_slash_command("plugins", cmd_plugins, "List loaded plugins", "/plugins")
 register_slash_command("pwd", cmd_pwd, "Show current directory", "/pwd")
+register_slash_command("copy", cmd_copy, "Copy last response to clipboard", "/copy")
+register_slash_command("compact", cmd_compact, "Toggle compact mode (hide stats)", "/compact")
+register_slash_command("save", cmd_save, "Save conversation", "/save [name]")
+register_slash_command("resume", cmd_resume, "Resume saved conversation", "/resume [name]")
+register_slash_command("theme", cmd_theme, "Set color theme", "/theme [name]")

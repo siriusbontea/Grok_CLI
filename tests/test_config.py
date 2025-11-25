@@ -24,13 +24,25 @@ def mock_home(temp_grok_dir: Path):
 
 
 def test_get_grok_dir_creates_directories(mock_home: Path):
-    """Test that get_grok_dir creates required directories."""
+    """Test that get_grok_dir creates required global directories."""
     grok_dir = config.get_grok_dir()
 
     assert grok_dir.exists()
     assert (grok_dir / "cache").exists()
-    assert (grok_dir / "sessions").exists()
     assert (grok_dir / "plugins").exists()
+    # Note: sessions now live in project-local .grok/ directory
+
+
+def test_get_project_dir_creates_directories(tmp_path: Path):
+    """Test that get_project_dir creates project-local directories."""
+    # Set launch directory to temp path
+    config.set_launch_dir(tmp_path)
+
+    project_dir = config.get_project_dir()
+
+    assert project_dir.exists()
+    assert project_dir == tmp_path / ".grok"
+    assert (project_dir / "sessions").exists()
 
 
 def test_get_config_path(mock_home: Path):

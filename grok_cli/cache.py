@@ -1,7 +1,12 @@
 """API response caching with SHA256 hashing and automatic pruning.
 
-Cache files are stored as ~/.grok/cache/<sha256>.json
-Pruned when >30 days old or total cache size >500 MB
+Cache is stored globally at ~/.grok/cache/<sha256>.json since API
+responses are project-independent (same prompt = same response).
+
+Project-specific data (sessions, history) is stored in .grok/ within
+each project directory.
+
+Cache is pruned when >30 days old or total cache size >500 MB
 """
 
 import hashlib

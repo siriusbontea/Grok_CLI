@@ -4,6 +4,8 @@ These tools allow the model to interact with the filesystem
 in a controlled, sandboxed manner.
 """
 
+import difflib
+import re
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +19,101 @@ console = Console()
 
 # Large file threshold (lines)
 LARGE_FILE_THRESHOLD = 100
+
+# Max diff lines to show before truncating
+MAX_DIFF_LINES = 200
+
+# Diff display styles
+DIFF_STYLE_HEADER = "bold white"
+DIFF_STYLE_HUNK = "bold cyan"
+DIFF_STYLE_ADD = "white on green"
+DIFF_STYLE_REMOVE = "white on red"
+DIFF_STYLE_CONTEXT = "grey70 on grey23"
+
+
+def _show_diff(old_content: str, new_content: str, path: str) -> None:
+    """Display a colored unified diff between old and new content.
+
+    Shows line numbers with full-line highlighting:
+    - Removed lines: white text on red background
+    - Added lines: white text on green background
+    - Context lines: grey text on dark grey background
+
+    Args:
+        old_content: Original file content
+        new_content: New file content
+        path: File path (for diff header)
+    """
+    old_lines = old_content.splitlines()
+    new_lines = new_content.splitlines()
+
+    # Generate diff with context
+    diff = list(
+        difflib.unified_diff(
+            old_lines,
+            new_lines,
+            fromfile=f"a/{path}",
+            tofile=f"b/{path}",
+            lineterm="",
+        )
+    )
+
+    if not diff:
+        console.print("[dim]No changes[/dim]")
+        return
+
+    # Truncate if too long
+    truncated = False
+    if len(diff) > MAX_DIFF_LINES:
+        diff = diff[:MAX_DIFF_LINES]
+        truncated = True
+
+    console.print()
+
+    # Track line numbers
+    old_line_num = 0
+    new_line_num = 0
+
+    # Get terminal width for full-line highlighting
+    term_width = console.width or 80
+
+    for line in diff:
+        if line.startswith("---") or line.startswith("+++"):
+            # File header
+            console.print(f"[{DIFF_STYLE_HEADER}]{line}[/]")
+        elif line.startswith("@@"):
+            # Hunk header - parse line numbers
+            console.print(f"[{DIFF_STYLE_HUNK}]{line}[/]")
+            # Extract starting line numbers from @@ -old,count +new,count @@
+            match = re.match(r"@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@", line)
+            if match:
+                old_line_num = int(match.group(1))
+                new_line_num = int(match.group(2))
+        elif line.startswith("-"):
+            # Removed line - red background
+            line_num_str = f"{old_line_num:4d} "
+            content = line[1:]  # Remove the - prefix
+            padded = f" - {line_num_str}{content}".ljust(term_width)
+            console.print(f"[{DIFF_STYLE_REMOVE}]{padded}[/]")
+            old_line_num += 1
+        elif line.startswith("+"):
+            # Added line - green background
+            line_num_str = f"{new_line_num:4d} "
+            content = line[1:]  # Remove the + prefix
+            padded = f" + {line_num_str}{content}".ljust(term_width)
+            console.print(f"[{DIFF_STYLE_ADD}]{padded}[/]")
+            new_line_num += 1
+        else:
+            # Context line - grey background
+            line_num_str = f"{old_line_num:4d} "
+            content = line[1:] if line.startswith(" ") else line
+            padded = f"   {line_num_str}{content}".ljust(term_width)
+            console.print(f"[{DIFF_STYLE_CONTEXT}]{padded}[/]")
+            old_line_num += 1
+            new_line_num += 1
+
+    if truncated:
+        console.print(f"\n[yellow]... diff truncated (showing first {MAX_DIFF_LINES} lines)[/yellow]")
 
 # Tool definitions for the OpenAI-compatible API
 TOOL_DEFINITIONS = [
@@ -188,17 +285,24 @@ def tool_write_file(path: str, content: str, auto_confirm: bool = False) -> dict
     # Show preview
     console.print(f"\n[bold]{action}:[/bold] {path}")
 
-    if lines > LARGE_FILE_THRESHOLD:
-        console.print(
-            f"[yellow]Warning: Large file ({lines} lines). Showing first {LARGE_FILE_THRESHOLD} lines.[/yellow]\n"
-        )
-        preview_content = "\n".join(content.split("\n")[:LARGE_FILE_THRESHOLD])
-        preview_content += f"\n... ({lines - LARGE_FILE_THRESHOLD} more lines)"
+    if file_exists:
+        # Show diff for overwrites (red/green like edit_file)
+        old_content = abs_path.read_text()
+        _show_diff(old_content, content, path)
     else:
-        preview_content = content
+        # Show content preview for new files
+        if lines > LARGE_FILE_THRESHOLD:
+            console.print(
+                f"[yellow]Warning: Large file ({lines} lines). Showing first {LARGE_FILE_THRESHOLD} lines.[/yellow]\n"
+            )
+            preview_content = "\n".join(content.split("\n")[:LARGE_FILE_THRESHOLD])
+            preview_content += f"\n... ({lines - LARGE_FILE_THRESHOLD} more lines)"
+        else:
+            preview_content = content
 
-    syntax = Syntax(preview_content, suffix, theme="monokai", line_numbers=True)
-    console.print(syntax)
+        syntax = Syntax(preview_content, suffix, theme="monokai", line_numbers=True)
+        console.print(syntax)
+
     console.print()
 
     # Confirm
@@ -245,10 +349,9 @@ def tool_edit_file(path: str, old_text: str, new_text: str, auto_confirm: bool =
     # Create new content
     new_content = content.replace(old_text, new_text)
 
-    # Show diff preview
-    console.print(f"\n[bold]Edit:[/bold] {path} ({occurrences} occurrence(s))\n")
-    console.print("[red]- " + old_text.replace("\n", "\n- ") + "[/red]")
-    console.print("[green]+ " + new_text.replace("\n", "\n+ ") + "[/green]")
+    # Show diff preview with color
+    console.print(f"\n[bold]Edit:[/bold] {path} ({occurrences} occurrence(s))")
+    _show_diff(content, new_content, path)
     console.print()
 
     # Confirm

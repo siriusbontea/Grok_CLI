@@ -3,6 +3,7 @@ name = "grok-cli"
 version = "1.0.0.dev0"
 description = "Lean, safe command-line interface for Grok models"
 authors = ["Sirius T. Bontea"]
+license = "BSD-3-Clause"
 readme = "README.md"
 packages = [{include = "grok_cli"}]
 

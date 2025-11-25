@@ -25,6 +25,11 @@ def init_sandbox() -> None:
     LAUNCH_DIR = Path.cwd().resolve()
     CURRENT_DIR = LAUNCH_DIR
 
+    # Share launch directory with config module for project-local storage
+    from grok_cli import config
+
+    config.set_launch_dir(LAUNCH_DIR)
+
 
 def get_current_dir() -> Path:
     """Get the current working directory within sandbox.
@@ -61,10 +66,7 @@ def set_current_dir(path: Path) -> None:
     try:
         resolved.relative_to(LAUNCH_DIR)
     except ValueError:
-        raise PermissionError(
-            f"Cannot cd outside launch directory: {LAUNCH_DIR}\n"
-            f"Attempted path: {resolved}"
-        )
+        raise PermissionError(f"Cannot cd outside launch directory: {LAUNCH_DIR}\n" f"Attempted path: {resolved}")
 
     CURRENT_DIR = resolved
 
@@ -93,8 +95,7 @@ def check_path_allowed(path: Path, operation: str = "access") -> Path:
         resolved.relative_to(LAUNCH_DIR)
     except ValueError:
         raise PermissionError(
-            f"Cannot {operation} path outside launch directory: {resolved}\n"
-            f"Launch directory: {LAUNCH_DIR}"
+            f"Cannot {operation} path outside launch directory: {resolved}\n" f"Launch directory: {LAUNCH_DIR}"
         )
 
     return resolved
