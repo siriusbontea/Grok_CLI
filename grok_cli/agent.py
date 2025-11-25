@@ -36,7 +36,7 @@ Current working directory: {cwd}
 
 Available tools:
 - read_file: Read contents of a file
-- write_file: Create or overwrite a file
+- write_file: Create or overwrite a file (with automatic validation for .py, .json, .yaml, .toml, .tex, .js)
 - edit_file: Make targeted edits to an existing file
 - list_files: List files in a directory
 
@@ -47,6 +47,12 @@ Guidelines:
 4. Be concise but helpful in your responses.
 5. If you're unsure what the user wants, ask for clarification.
 6. For general questions that don't require file operations, just respond normally without using tools.
+
+File Validation:
+- Files are automatically validated after writing (Python, JSON, YAML, TOML, LaTeX, JavaScript).
+- If validation errors are reported, carefully review them and fix the issues by writing corrected content.
+- Common issues: syntax errors, unmatched braces/brackets, missing required fields.
+- For LaTeX: ensure \\begin and \\end environments match, braces are balanced.
 """
 
 

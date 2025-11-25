@@ -14,6 +14,7 @@ from rich.syntax import Syntax
 from rich.prompt import Confirm
 
 from grok_cli import sandbox
+from grok_cli.validators import validate_file
 
 console = Console()
 
@@ -313,9 +314,33 @@ def tool_write_file(path: str, content: str, auto_confirm: bool = False) -> dict
     # Create parent directories if needed
     abs_path.parent.mkdir(parents=True, exist_ok=True)
 
+    # Validate content before writing (for supported file types)
+    validation = validate_file(content, path)
+    if validation and validation.has_errors:
+        # Show validation errors
+        console.print(f"\n[red]Validation errors found in {path}:[/red]")
+        for err in validation.errors:
+            console.print(f"  [red]•[/red] {err}")
+        if validation.warnings:
+            for warn in validation.warnings:
+                console.print(f"  [yellow]•[/yellow] {warn}")
+
+        # Ask if user wants to save anyway
+        if not auto_confirm:
+            if not Confirm.ask("Save file anyway despite errors?", default=False):
+                return {
+                    "success": False,
+                    "error": f"Validation failed:\n{validation.format_report()}",
+                }
+
     # Write file
     abs_path.write_text(content)
     console.print(f"[green]✓[/green] {action}d: {path}")
+
+    # Return validation info in result if there were issues
+    if validation and (validation.errors or validation.warnings):
+        result_msg = f"Wrote {len(content)} bytes to {path}, but validation found issues:\n{validation.format_report()}"
+        return {"success": True, "result": result_msg, "validation_errors": validation.errors}
 
     return {"success": True, "result": f"Successfully wrote {len(content)} bytes to {path}"}
 
@@ -354,14 +379,36 @@ def tool_edit_file(path: str, old_text: str, new_text: str, auto_confirm: bool =
     _show_diff(content, new_content, path)
     console.print()
 
-    # Confirm
-    if not auto_confirm:
+    # Validate new content before applying (for supported file types)
+    validation = validate_file(new_content, path)
+    if validation and validation.has_errors:
+        console.print("\n[red]Validation errors in edited content:[/red]")
+        for err in validation.errors:
+            console.print(f"  [red]•[/red] {err}")
+        if validation.warnings:
+            for warn in validation.warnings:
+                console.print(f"  [yellow]•[/yellow] {warn}")
+
+        if not auto_confirm:
+            if not Confirm.ask("Apply edit anyway despite errors?", default=False):
+                return {
+                    "success": False,
+                    "error": f"Validation failed:\n{validation.format_report()}",
+                }
+
+    # Confirm (if validation passed or no validation available)
+    elif not auto_confirm:
         if not Confirm.ask("Apply this edit?", default=False):
             return {"success": False, "error": "User cancelled"}
 
     # Write file
     abs_path.write_text(new_content)
     console.print(f"[green]✓[/green] Edited: {path}")
+
+    # Return validation info if there were issues
+    if validation and (validation.errors or validation.warnings):
+        result_msg = f"Edited {path} ({occurrences} replacement(s)), but validation found issues:\n{validation.format_report()}"
+        return {"success": True, "result": result_msg, "validation_errors": validation.errors}
 
     return {"success": True, "result": f"Successfully edited {path} ({occurrences} replacement(s))"}
 
