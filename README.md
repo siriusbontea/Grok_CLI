@@ -59,10 +59,10 @@ pip install grok-cli
 
 ### 1. Set your API key
 
-Get your API key from [console.grok.com](https://console.grok.com) and set it:
+Get your API key from [console.x.ai](https://console.x.ai) and set it:
 
 ```bash
-export GROK_API_KEY=your_key_here
+export XAI_API_KEY=your_key_here
 ```
 
 Add to your `~/.bashrc` or `~/.zshrc` to make it permanent.
@@ -262,7 +262,6 @@ Copyright (c) 2025, Sirius T. Bontea
 ## Contributing
 
 ### Design Philosophy
-
 The Grok CLI design philosophy is built on four unwavering principles: lean, safe, discoverable, and token-efficient. Following Unix philosophy, it does one thing well and composes via pipes and plugins, keeping the core minimal while extensibility lives in ~/.grok/plugins/. Safety is paramount—operations are sandboxed to the launch directory by default, file overwrites require confirmation, and escaping the sandbox demands typing "YES" explicitly. Token efficiency is achieved through TOON format (30-60% savings vs JSON) for all model communications, while human-facing configuration uses TOML for readability and comments. The CLI embraces verbose, self-documenting code by default with an optional lean mode for power users, follows progressive automation (interactive-first, then --yes flag), and maintains zero hidden state with no per-project dotfiles or init commands required—everything is transparent, inspectable, and diffable in ~/.grok/.
 
 - Grok CLI is designed to be extensible via plugins.

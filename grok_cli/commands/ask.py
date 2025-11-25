@@ -28,7 +28,7 @@ def ask_command(question: str, cfg: dict[str, Any]) -> str:
     api_key = config.get_api_key()
     if not api_key:
         raise ValueError(
-            "GROK_API_KEY not set. Get your key from console.grok.com and:\n" "  export GROK_API_KEY=your_key_here"
+            "XAI_API_KEY not set. Get your key from console.x.ai and:\n" "  export XAI_API_KEY=your_key_here"
         )
 
     # Initialize provider

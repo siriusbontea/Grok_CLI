@@ -57,7 +57,7 @@ def show_welcome_banner() -> None:
     welcome_text.append("\n", style="dim")
 
     welcome_text.append("API Key: ", style="dim")
-    welcome_text.append("export GROK_API_KEY=your_key_here", style="yellow")
+    welcome_text.append("export XAI_API_KEY=your_key_here", style="yellow")
 
     console.print(welcome_text)
     console.print()

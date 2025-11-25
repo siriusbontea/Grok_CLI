@@ -17,16 +17,16 @@ poetry install
 
 ### 3. Set Your API Key
 
-Get your API key from [console.grok.com](https://console.grok.com) and set it:
+Get your API key from [console.x.ai](https://console.x.ai) and set it:
 
 ```bash
-export GROK_API_KEY=your_key_here
+export XAI_API_KEY=your_key_here
 ```
 
 Add to `~/.bashrc` or `~/.zshrc` to make it permanent:
 
 ```bash
-echo 'export GROK_API_KEY=your_key_here' >> ~/.zshrc
+echo 'export XAI_API_KEY=your_key_here' >> ~/.zshrc
 ```
 
 ### 4. Run the CLI
@@ -129,7 +129,7 @@ exit
 
 **API key not set:**
 ```
-Error: GROK_API_KEY not set
+Error: XAI_API_KEY not set
 ```
 Solution: Set the environment variable as shown in step 3.
 

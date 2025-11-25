@@ -71,9 +71,7 @@ def cmd_ls(args: list[str]) -> None:
 
     # List contents
     try:
-        items = sorted(
-            target_abs.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower())
-        )
+        items = sorted(target_abs.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower()))
     except PermissionError:
         console.print(f"[red]Error:[/red] Permission denied: {target}")
         return
@@ -152,28 +150,18 @@ def cmd_cd(args: list[str]) -> None:
     # Try to set (will check sandbox)
     try:
         sandbox.set_current_dir(target)
-    except PermissionError as e:
+    except PermissionError:
         # Show prominent warning when trying to escape sandbox
         console.print()
-        console.print(
-            "[bold red]╔══════════════════════════════════════════════════════════╗[/bold red]"
-        )
-        console.print(
-            "[bold red]║    SANDBOX VIOLATION: Cannot navigate outside project    ║[/bold red]"
-        )
-        console.print(
-            "[bold red]╚══════════════════════════════════════════════════════════╝[/bold red]"
-        )
+        console.print("[bold red]╔══════════════════════════════════════════════════════════╗[/bold red]")
+        console.print("[bold red]║    SANDBOX VIOLATION: Cannot navigate outside project    ║[/bold red]")
+        console.print("[bold red]╚══════════════════════════════════════════════════════════╝[/bold red]")
         console.print()
         console.print(f"[yellow]Attempted path:[/yellow] {target}")
         console.print(f"[yellow]Project root:[/yellow]   {sandbox.get_launch_dir()}")
         console.print()
-        console.print(
-            "[dim]All operations are restricted to the project directory for safety.[/dim]"
-        )
-        console.print(
-            "[dim]Use --dangerously-allow-entire-fs flag to disable sandbox.[/dim]"
-        )
+        console.print("[dim]All operations are restricted to the project directory for safety.[/dim]")
+        console.print("[dim]Use --dangerously-allow-entire-fs flag to disable sandbox.[/dim]")
         console.print()
 
 
@@ -386,9 +374,7 @@ def cmd_tree(args: list[str]) -> None:
         console.print(f"[red]Error:[/red] {e}")
 
 
-def _build_tree(
-    path: Path, tree: Tree, current_depth: int = 0, max_depth: int = 3
-) -> None:
+def _build_tree(path: Path, tree: Tree, current_depth: int = 0, max_depth: int = 3) -> None:
     """Recursively build tree structure.
 
     Args:
@@ -504,9 +490,7 @@ def cmd_rm(args: list[str]) -> None:
 
             if target_abs.is_dir():
                 if not recursive:
-                    console.print(
-                        f"[red]Error:[/red] {file_path} is a directory (use -r for recursive)"
-                    )
+                    console.print(f"[red]Error:[/red] {file_path} is a directory (use -r for recursive)")
                     continue
                 shutil.rmtree(target_abs)
             else:

@@ -161,4 +161,4 @@ def get_api_key() -> str | None:
     Returns:
         API key string or None if not set
     """
-    return os.getenv("GROK_API_KEY")
+    return os.getenv("XAI_API_KEY")

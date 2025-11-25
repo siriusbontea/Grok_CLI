@@ -137,13 +137,15 @@ def _prune_cache_if_needed() -> None:
     # Delete files older than 30 days
     cutoff_time = time.time() - (30 * 24 * 60 * 60)  # 30 days in seconds
     for cache_file in cache_files[:]:
-        if cache_file.stat().st_mtime < cutoff_time:
-            try:
+        try:
+            file_stat = cache_file.stat()
+            if file_stat.st_mtime < cutoff_time:
+                file_size = file_stat.st_size
                 cache_file.unlink()
                 cache_files.remove(cache_file)
-                total_size -= cache_file.stat().st_size
-            except Exception:
-                pass
+                total_size -= file_size
+        except Exception:
+            pass
 
     # Delete oldest files until under size limit
     while total_size > max_size and cache_files:

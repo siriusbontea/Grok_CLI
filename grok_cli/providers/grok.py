@@ -5,6 +5,7 @@ Implements retry logic with exponential backoff for rate limits.
 """
 
 import os
+import random
 import time
 from typing import Any
 
@@ -20,18 +21,18 @@ class GrokProvider(Provider):
         """Initialize Grok provider.
 
         Args:
-            api_key: Grok API key (defaults to GROK_API_KEY env var)
+            api_key: Grok API key (defaults to XAI_API_KEY env var)
 
         Raises:
             ValueError: If API key is not provided
         """
-        self.api_key = api_key or os.getenv("GROK_API_KEY")
+        self.api_key = api_key or os.getenv("XAI_API_KEY")
 
         if not self.api_key:
             raise ValueError(
-                "GROK_API_KEY environment variable not set.\n"
-                "Get your API key from console.grok.com and set it:\n"
-                "  export GROK_API_KEY=your_key_here"
+                "XAI_API_KEY environment variable not set.\n"
+                "Get your API key from console.x.ai and set it:\n"
+                "  export XAI_API_KEY=your_key_here"
             )
 
         # Initialize OpenAI client with Grok endpoint
@@ -103,8 +104,6 @@ class GrokProvider(Provider):
                     delay = min(initial_delay * (2**attempt), max_delay)
 
                     # Add some jitter
-                    import random
-
                     delay *= 0.5 + random.random()
 
                     time.sleep(delay)
@@ -119,7 +118,7 @@ class GrokProvider(Provider):
             except AuthenticationError as e:
                 # Don't retry authentication errors
                 raise ValueError(
-                    "Invalid API key. Please check your GROK_API_KEY.\n" "Get your API key from console.grok.com"
+                    "Invalid API key. Please check your XAI_API_KEY.\n" "Get your API key from console.x.ai"
                 ) from e
 
             except APIError as e:

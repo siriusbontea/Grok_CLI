@@ -44,7 +44,7 @@ def heavy_command(task: str, session_context: dict[str, Any] | None, cfg: dict[s
     api_key = config.get_api_key()
     if not api_key:
         raise ValueError(
-            "GROK_API_KEY not set. Get your key from console.grok.com and:\n" "  export GROK_API_KEY=your_key_here"
+            "XAI_API_KEY not set. Get your key from console.x.ai and:\n" "  export XAI_API_KEY=your_key_here"
         )
 
     # Initialize provider

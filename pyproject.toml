@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "grok-cli"
-version = "1.0.0+current"
+version = "1.0.0.dev0"
 description = "Lean, safe command-line interface for Grok models"
 authors = ["Sirius T. Bontea"]
 readme = "README.md"

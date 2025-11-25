@@ -171,7 +171,7 @@ def help_command(topic: str | None = None) -> None:
 
 [bold]Configuration:[/bold]
   Config file: [cyan]~/.grok/config.toml[/cyan]
-  API key: [cyan]export GROK_API_KEY=your_key[/cyan]
+  API key: [cyan]export XAI_API_KEY=your_key[/cyan]
 
 [bold]Examples:[/bold]
   grok ask "explain async/await in Python"

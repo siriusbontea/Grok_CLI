@@ -24,9 +24,7 @@ console = Console()
 def main(
     ctx: typer.Context,
     dangerously_allow_entire_fs: bool = typer.Option(
-        default=False,
-        flag_value=True,
-        help="Disable filesystem sandbox (requires typing 'YES')"
+        default=False, flag_value=True, help="Disable filesystem sandbox (requires typing 'YES')"
     ),
 ) -> None:
     """Grok CLI - Lean, safe interface for Grok models.
@@ -53,6 +51,7 @@ def main(
             show_banner()
 
         from grok_cli.repl import start_repl
+
         start_repl(cfg)
 
 
