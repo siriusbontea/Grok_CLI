@@ -8,13 +8,13 @@ from grok_cli import sandbox
 def test_sandbox_init():
     """Test sandbox initialization."""
     # This should not raise
-    sandbox.init_sandbox(dangerous=False)
+    sandbox.init_sandbox()
     assert sandbox.get_current_dir() == Path.cwd().resolve()
 
 
 def test_check_path_allowed_relative():
     """Test that relative paths within cwd are allowed."""
-    sandbox.init_sandbox(dangerous=False)
+    sandbox.init_sandbox()
     cwd = Path.cwd()
 
     # Relative path should be allowed
@@ -25,7 +25,7 @@ def test_check_path_allowed_relative():
 
 def test_check_path_allowed_absolute_within():
     """Test that absolute paths within cwd are allowed."""
-    sandbox.init_sandbox(dangerous=False)
+    sandbox.init_sandbox()
     cwd = Path.cwd()
 
     # Absolute path within cwd should be allowed
@@ -36,7 +36,7 @@ def test_check_path_allowed_absolute_within():
 
 def test_check_path_denied_outside():
     """Test that paths outside cwd are denied."""
-    sandbox.init_sandbox(dangerous=False)
+    sandbox.init_sandbox()
 
     # Path outside cwd should be denied
     test_path = Path("/tmp/test.txt")
@@ -49,7 +49,7 @@ def test_check_path_denied_outside():
 
 def test_set_current_dir_within_sandbox():
     """Test changing directory within sandbox."""
-    sandbox.init_sandbox(dangerous=False)
+    sandbox.init_sandbox()
     cwd = Path.cwd()
 
     # Create a subdirectory path (doesn't need to exist for this test)
@@ -67,7 +67,7 @@ def test_set_current_dir_within_sandbox():
 
 def test_set_current_dir_outside_sandbox():
     """Test that changing to directory outside sandbox is denied."""
-    sandbox.init_sandbox(dangerous=False)
+    sandbox.init_sandbox()
 
     # Try to cd outside sandbox
     outside_dir = Path("/tmp")
@@ -78,7 +78,12 @@ def test_set_current_dir_outside_sandbox():
     assert "outside launch directory" in str(exc_info.value).lower()
 
 
-def test_dangerous_mode_allows_all():
-    """Test that dangerous mode allows filesystem access (requires YES input)."""
-    # Note: This test would require mocking input, so we'll just test the flag
-    assert not sandbox.is_dangerous_mode()  # Should be False by default
+def test_sandbox_always_enforced():
+    """Test that sandbox cannot be disabled."""
+    sandbox.init_sandbox()
+
+    # Path outside cwd should always be denied
+    test_path = Path("/etc/passwd")
+
+    with pytest.raises(PermissionError):
+        sandbox.check_path_allowed(test_path, "read")

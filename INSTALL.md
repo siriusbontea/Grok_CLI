@@ -32,13 +32,47 @@ echo 'export XAI_API_KEY=your_key_here' >> ~/.zshrc
 ### 4. Run the CLI
 
 ```bash
-# Enter REPL mode
 poetry run grok
+```
 
-# Or run commands directly
-poetry run grok ask "explain async/await in Python"
-poetry run grok create py "binary search algorithm"
-poetry run grok help
+## Usage
+
+### Natural Language (Default)
+
+Just type what you want:
+
+```
+grok> What is Python?
+grok> Create a hello world script in Python
+grok> Read main.py and summarize it
+grok> Add docstrings to utils.py
+```
+
+### Slash Commands
+
+```
+grok> /help              # Show help
+grok> /models            # List available models
+grok> /model grok41_heavy # Switch model
+grok> /cost              # Show token usage
+grok> /y                 # Enable auto-confirm
+grok> /exit              # Exit
+```
+
+### Shell Commands
+
+```
+grok> ls                 # List files
+grok> cd src             # Change directory
+grok> cat README.md      # View file
+grok> pwd                # Print working directory
+```
+
+### Command Line Options
+
+```bash
+# Start with auto-confirm (skip file operation prompts)
+poetry run grok -y
 ```
 
 ## Running Tests
@@ -69,7 +103,7 @@ On first run, a config file is created at `~/.grok/config.toml`:
 ```toml
 default_model = "grok41_fast"
 auto_compress = "smart"      # always | smart | never
-auto_yes = false
+auto_yes = false             # true → skip file operation prompts
 colour = true
 lean_mode = false            # true → minimal comments in generated code
 budget_monthly = 0.0         # 0 = disabled
@@ -85,44 +119,7 @@ web_daily_quota = 100000     # tokens via web plugin
 ├── sessions/
 │   ├── 2025-11-22T14:30.toon
 │   └── current → symlink    # Current session
-└── plugins/*.py            # Custom plugins
-```
-
-## Available Commands
-
-**Core:**
-- `ask <question>` - General queries
-- `create <type> <description>` - Generate files
-- `edit <file> <instruction>` - Modify files with diff
-- `heavy <task>` - Complex tasks (3 agents + meta-resolver)
-
-**Utility:**
-- `model <name>` - Switch model
-- `models` - List available models
-- `plugins` - List loaded plugins
-- `resume` - Continue last session
-- `cost` - Token usage dashboard
-- `help [topic]` - Documentation
-
-**Shell:**
-- `ls, ll, cd, pwd, cat, head, tail, mkdir, tree, cp, mv, rm`
-
-## Example Usage
-
-```bash
-# Start REPL
-poetry run grok
-
-# In REPL:
-help
-models
-model grok41_heavy
-create py "binary search with type hints"
-edit binary_search.py "add docstrings"
-ask "explain time complexity"
-ls
-pwd
-exit
+└── plugins/*.py             # Custom plugins
 ```
 
 ## Troubleshooting
@@ -143,16 +140,15 @@ Solution: Run `poetry install` first.
 ```
 Error: Cannot access path outside launch directory
 ```
-Solution: The CLI is sandboxed by default. Use `--dangerously-allow-entire-fs` to disable (requires typing "YES").
+Solution: The CLI is sandboxed to the directory where you launched it. This is a safety feature and cannot be disabled. Navigate to the directory you want to work in, then run `grok` from there.
 
 ## Next Steps
 
 1. Read `README.md` for detailed documentation
-2. Check `Grok_CLI_Blueprint_v1.md` for complete architecture
+2. Type `/help` in the CLI for interactive help
 3. Create plugins in `~/.grok/plugins/`
 
 ## Support
 
 - Issues: Create a GitHub issue
-- Documentation: Run `grok help`
-- Blueprint: See `Grok_CLI_Blueprint_v1.md`
+- Documentation: Type `/help` in the CLI

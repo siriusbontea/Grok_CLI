@@ -23,20 +23,22 @@ console = Console()
 @app.callback(invoke_without_command=True)
 def main(
     ctx: typer.Context,
-    dangerously_allow_entire_fs: bool = typer.Option(
-        default=False, flag_value=True, help="Disable filesystem sandbox (requires typing 'YES')"
-    ),
+    yes: bool = typer.Option(False, "-y", "--yes", help="Auto-confirm file operations (skip prompts)"),
 ) -> None:
-    """Grok CLI - Lean, safe interface for Grok models.
+    """Grok CLI - Natural language interface for Grok models.
 
-    Run without arguments to enter REPL mode.
-    Run with a command to execute directly.
+    Run without arguments to enter interactive mode.
+    Type naturally to chat, use /help for commands.
     """
-    # Initialize sandbox
-    sandbox.init_sandbox(dangerous=dangerously_allow_entire_fs)
+    # Initialize sandbox (always enforced, cannot be disabled)
+    sandbox.init_sandbox()
 
     # Load configuration (creates default on first run)
     cfg = config.load_config()
+
+    # Override auto_yes if -y flag is passed
+    if yes:
+        cfg["auto_yes"] = True
 
     # If no subcommand specified, enter REPL mode
     if ctx.invoked_subcommand is None:

@@ -161,7 +161,6 @@ def cmd_cd(args: list[str]) -> None:
         console.print(f"[yellow]Project root:[/yellow]   {sandbox.get_launch_dir()}")
         console.print()
         console.print("[dim]All operations are restricted to the project directory for safety.[/dim]")
-        console.print("[dim]Use --dangerously-allow-entire-fs flag to disable sandbox.[/dim]")
         console.print()
 
 

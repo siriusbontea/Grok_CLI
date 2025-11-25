@@ -1,13 +1,12 @@
 """Sandbox enforcement for safe file operations.
 
-All file operations are restricted to the launch directory by default.
-The --dangerously-allow-entire-fs flag allows escaping with typed "YES" confirmation.
+All file operations are strictly restricted to the launch directory.
+This cannot be disabled - safety is mandatory.
 """
 
 from pathlib import Path
 
 from rich.console import Console
-from rich.prompt import Prompt
 
 # Launch directory - where grok was spawned (never changes)
 LAUNCH_DIR = Path.cwd().resolve()
@@ -15,40 +14,16 @@ LAUNCH_DIR = Path.cwd().resolve()
 # Current directory - updated by cd command, starts at LAUNCH_DIR
 CURRENT_DIR = LAUNCH_DIR
 
-# Global flag for dangerous mode
-DANGEROUS_MODE_ENABLED = False
-
 console = Console()
 
 
-def init_sandbox(dangerous: bool = False) -> None:
-    """Initialize sandbox with launch directory (where grok was spawned).
-
-    Args:
-        dangerous: If True, prompt for "YES" confirmation to allow entire filesystem
-    """
-    global LAUNCH_DIR, CURRENT_DIR, DANGEROUS_MODE_ENABLED
+def init_sandbox() -> None:
+    """Initialize sandbox with launch directory (where grok was spawned)."""
+    global LAUNCH_DIR, CURRENT_DIR
 
     # Lock to the directory where grok was spawned
     LAUNCH_DIR = Path.cwd().resolve()
     CURRENT_DIR = LAUNCH_DIR
-
-    console.print(f"[dim]Launch directory: {LAUNCH_DIR}[/dim]")
-
-    if dangerous:
-        console.print("\n[bold red]WARNING:[/bold red] You are about to disable filesystem sandboxing!")
-        console.print("This will allow operations on your [bold]entire filesystem[/bold].")
-        console.print(f"Current sandbox: [cyan]{LAUNCH_DIR}[/cyan]")
-        console.print("This could lead to accidental data loss or system damage.\n")
-
-        confirmation = Prompt.ask("Type [bold]YES[/bold] (all caps) to confirm", console=console)
-
-        if confirmation == "YES":
-            DANGEROUS_MODE_ENABLED = True
-            console.print("[yellow]Sandbox disabled. All filesystem operations enabled.[/yellow]")
-            console.print(f"[yellow]Working directory remains: {CURRENT_DIR}[/yellow]\n")
-        else:
-            console.print("[green]Sandbox remains enabled. Operations restricted to launch directory.[/green]\n")
 
 
 def get_current_dir() -> Path:
@@ -76,22 +51,20 @@ def set_current_dir(path: Path) -> None:
         path: New current directory
 
     Raises:
-        PermissionError: If path is outside sandbox and dangerous mode not enabled
+        PermissionError: If path is outside sandbox
     """
     global CURRENT_DIR
 
     resolved = path.resolve()
 
-    if not DANGEROUS_MODE_ENABLED:
-        # Check if new path is within launch directory
-        try:
-            resolved.relative_to(LAUNCH_DIR)
-        except ValueError:
-            raise PermissionError(
-                f"Cannot cd outside launch directory: {LAUNCH_DIR}\n"
-                f"Attempted path: {resolved}\n"
-                f"Use --dangerously-allow-entire-fs to disable sandbox"
-            )
+    # Check if new path is within launch directory
+    try:
+        resolved.relative_to(LAUNCH_DIR)
+    except ValueError:
+        raise PermissionError(
+            f"Cannot cd outside launch directory: {LAUNCH_DIR}\n"
+            f"Attempted path: {resolved}"
+        )
 
     CURRENT_DIR = resolved
 
@@ -107,7 +80,7 @@ def check_path_allowed(path: Path, operation: str = "access") -> Path:
         Resolved absolute path
 
     Raises:
-        PermissionError: If path is outside sandbox and dangerous mode not enabled
+        PermissionError: If path is outside sandbox
     """
     # Make path absolute relative to CURRENT_DIR
     if not path.is_absolute():
@@ -115,16 +88,14 @@ def check_path_allowed(path: Path, operation: str = "access") -> Path:
 
     resolved = path.resolve()
 
-    if not DANGEROUS_MODE_ENABLED:
-        # Check if path is within launch directory
-        try:
-            resolved.relative_to(LAUNCH_DIR)
-        except ValueError:
-            raise PermissionError(
-                f"Cannot {operation} path outside launch directory: {resolved}\n"
-                f"Launch directory: {LAUNCH_DIR}\n"
-                f"Use --dangerously-allow-entire-fs to disable sandbox"
-            )
+    # Check if path is within launch directory
+    try:
+        resolved.relative_to(LAUNCH_DIR)
+    except ValueError:
+        raise PermissionError(
+            f"Cannot {operation} path outside launch directory: {resolved}\n"
+            f"Launch directory: {LAUNCH_DIR}"
+        )
 
     return resolved
 
@@ -144,6 +115,8 @@ def check_overwrite_allowed(path: Path, auto_yes: bool = False) -> bool:
     Raises:
         PermissionError: If path is outside sandbox
     """
+    from rich.prompt import Prompt
+
     # First check sandbox
     resolved = check_path_allowed(path, "overwrite")
 
@@ -159,12 +132,3 @@ def check_overwrite_allowed(path: Path, auto_yes: bool = False) -> bool:
     confirmation = Prompt.ask("Overwrite? (y/N)", choices=["y", "n", "Y", "N"], default="n", console=console)
 
     return confirmation.lower() == "y"
-
-
-def is_dangerous_mode() -> bool:
-    """Check if dangerous mode is enabled.
-
-    Returns:
-        True if --dangerously-allow-entire-fs was confirmed
-    """
-    return DANGEROUS_MODE_ENABLED

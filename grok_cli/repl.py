@@ -1,13 +1,14 @@
 """Interactive REPL implementation using prompt_toolkit.
 
 Provides:
+- Natural language interaction by default
+- Slash commands for utility functions (/help, /model, etc.)
+- Shell commands (ls, cd, etc.)
 - Arrow key history navigation
 - Ctrl+R reverse search
 - Context-aware tab completion
-- Integration with Typer command parsing
 """
 
-import shlex
 from typing import Any, Iterator
 
 from prompt_toolkit import PromptSession
@@ -19,28 +20,29 @@ from rich.console import Console
 
 from grok_cli import config
 from grok_cli.ui.prompt import create_prompt, PROMPT_STYLE
+from grok_cli.agent import Agent, display_response
+from grok_cli.slash_commands import (
+    is_slash_command,
+    parse_slash_command,
+    execute_slash_command,
+    SLASH_COMMANDS,
+)
+from grok_cli.commands.shell import is_shell_command, execute_shell_command
 
 console = Console()
 
 
 class GrokCompleter(Completer):
-    """Tab completer for Grok CLI commands."""
+    """Tab completer for Grok CLI."""
 
     def __init__(self) -> None:
-        """Initialize completer with basic commands."""
-        # Basic commands (will be expanded with plugin discovery)
-        self.commands = [
-            "create",
-            "edit",
-            "ask",
-            "heavy",
-            "resume",
-            "model",
-            "models",
-            "cost",
-            "plugins",
-            "help",
-            # Shell commands
+        """Initialize completer."""
+        # Slash commands
+        self.slash_commands = [f"/{cmd}" for cmd in SLASH_COMMANDS.keys()]
+        self.slash_commands.extend(["/exit", "/quit", "/q"])
+
+        # Shell commands
+        self.shell_commands = [
             "ls",
             "ll",
             "cd",
@@ -53,9 +55,6 @@ class GrokCompleter(Completer):
             "cp",
             "mv",
             "rm",
-            # Special
-            "exit",
-            "quit",
         ]
 
     def get_completions(self, document: Document, complete_event: Any) -> Iterator[Completion]:
@@ -68,164 +67,22 @@ class GrokCompleter(Completer):
         Yields:
             Completion objects
         """
-        text = document.text_before_cursor
-        words = text.split()
+        text = document.text_before_cursor.strip()
 
-        # If empty or first word, complete command names
-        if not words or (len(words) == 1 and not text.endswith(" ")):
+        # Slash command completion
+        if text.startswith("/"):
+            for cmd in self.slash_commands:
+                if cmd.startswith(text):
+                    yield Completion(cmd, start_position=-len(text))
+            return
+
+        # Shell command completion (only at start of line)
+        words = text.split()
+        if not words or (len(words) == 1 and not document.text_before_cursor.endswith(" ")):
             word = words[0] if words else ""
-            for cmd in self.commands:
+            for cmd in self.shell_commands:
                 if cmd.startswith(word):
                     yield Completion(cmd, start_position=-len(word))
-
-        # TODO: Context-aware completion for arguments
-        # For now, just file/directory completion would go here
-
-
-def parse_command(line: str) -> list[str] | None:
-    """Parse command line into arguments.
-
-    Handles quotes and escaping properly.
-
-    Args:
-        line: Command line string
-
-    Returns:
-        List of arguments or None if empty
-    """
-    line = line.strip()
-    if not line:
-        return None
-
-    # Handle exit/quit specially
-    if line in ("exit", "quit"):
-        return None
-
-    try:
-        return shlex.split(line)
-    except ValueError as e:
-        console.print(f"[red]Parse error:[/red] {e}")
-        return []
-
-
-def execute_command(args: list[str], cfg: dict[str, Any]) -> bool:
-    """Execute a command in the REPL.
-
-    Args:
-        args: Command arguments
-        cfg: Configuration dictionary
-
-    Returns:
-        True to continue REPL, False to exit
-    """
-    if not args:
-        return True
-
-    command = args[0]
-    cmd_args = args[1:]
-
-    # Check if it's a shell command
-    from grok_cli.commands.shell import is_shell_command, execute_shell_command
-
-    if is_shell_command(command):
-        try:
-            execute_shell_command(args)
-        except Exception as e:
-            console.print(f"[red]Error:[/red] {e}")
-        return True
-
-    # Route to command handlers
-    try:
-        if command == "ask":
-            if not cmd_args:
-                console.print("[red]Error:[/red] ask requires a question")
-                return True
-
-            from grok_cli.commands.ask import ask_command, display_answer
-
-            question = " ".join(cmd_args)
-            answer = ask_command(question, cfg)
-            display_answer(answer)
-
-        elif command == "create":
-            if len(cmd_args) < 2:
-                console.print("[red]Error:[/red] create requires <type> <description>")
-                console.print('Example: create py "binary search algorithm"')
-                return True
-
-            from grok_cli.commands.create import create_command
-
-            file_type = cmd_args[0]
-            description = " ".join(cmd_args[1:])
-            create_command(file_type, description, None, cfg)
-
-        elif command == "edit":
-            if len(cmd_args) < 2:
-                console.print("[red]Error:[/red] edit requires <file> <instruction>")
-                console.print('Example: edit utils.py "add type hints"')
-                return True
-
-            from grok_cli.commands.edit import edit_command
-
-            filename = cmd_args[0]
-            instruction = " ".join(cmd_args[1:])
-            edit_command(filename, instruction, cfg)
-
-        elif command == "heavy":
-            if not cmd_args:
-                console.print("[red]Error:[/red] heavy requires a task description")
-                return True
-
-            from grok_cli.commands.heavy import heavy_command, display_heavy_result
-
-            task = " ".join(cmd_args)
-            result = heavy_command(task, None, cfg)
-            display_heavy_result(result)
-
-        elif command == "models":
-            from grok_cli.commands.utility import models_command
-
-            models_command()
-
-        elif command == "model":
-            if not cmd_args:
-                console.print("[red]Error:[/red] model requires a model name")
-                console.print("Use 'models' to list available models")
-                return True
-
-            from grok_cli.commands.utility import model_command
-
-            model_command(cmd_args[0], cfg)
-
-        elif command == "plugins":
-            from grok_cli.commands.utility import plugins_command
-
-            plugins_command()
-
-        elif command == "resume":
-            from grok_cli.commands.utility import resume_command
-
-            resume_command(cfg)
-
-        elif command == "cost":
-            from grok_cli.commands.utility import cost_command
-
-            cost_command()
-
-        elif command == "help":
-            from grok_cli.commands.utility import help_command
-
-            topic = cmd_args[0] if cmd_args else None
-            help_command(topic)
-
-        else:
-            console.print(f"[yellow]Unknown command:[/yellow] {command}")
-            console.print("[dim]Type 'help' for available commands[/dim]")
-
-    except Exception as e:
-        console.print(f"[red]Error:[/red] {e}")
-
-    return True
 
 
 def start_repl(cfg: dict[str, Any]) -> None:
@@ -246,10 +103,13 @@ def start_repl(cfg: dict[str, Any]) -> None:
         style=Style.from_dict(PROMPT_STYLE),
     )
 
+    # Initialize agent
+    agent = Agent(cfg)
+
     # Get current model from config
     current_model = cfg.get("default_model", "grok41_fast")
 
-    console.print("[dim]Entering REPL mode. Type 'exit' or 'quit' to leave, 'help' for commands.[/dim]\n")
+    console.print("[dim]Type naturally to chat, /help for commands, /exit to quit[/dim]\n")
 
     # Main REPL loop
     while True:
@@ -259,20 +119,48 @@ def start_repl(cfg: dict[str, Any]) -> None:
 
             # Get user input
             line = session.prompt(prompt)
+            line = line.strip()
 
-            # Parse command
-            args = parse_command(line)
+            # Skip empty input
+            if not line:
+                continue
 
-            # Check for exit
-            if args is None:
+            # Check for exit commands (without slash for convenience)
+            if line.lower() in ("exit", "quit"):
                 break
 
-            # Execute command
-            if not execute_command(args, cfg):
-                break
+            # Handle slash commands
+            if is_slash_command(line):
+                command, args = parse_slash_command(line)
+
+                if not execute_slash_command(command, args, cfg, agent):
+                    break
+
+                # Update current model in case it changed
+                current_model = cfg.get("default_model", current_model)
+                continue
+
+            # Handle shell commands
+            first_word = line.split()[0] if line.split() else ""
+            if is_shell_command(first_word):
+                try:
+                    execute_shell_command(line.split())
+                except Exception as e:
+                    console.print(f"[red]Error:[/red] {e}")
+                continue
+
+            # Default: send to agent as natural language
+            try:
+                response = agent.chat(line)
+                display_response(response)
+            except ValueError as e:
+                # API key not set or other config error
+                console.print(f"[red]Error:[/red] {e}")
+            except Exception as e:
+                console.print(f"[red]Error:[/red] {e}")
 
         except KeyboardInterrupt:
-            console.print("\n[dim]Use 'exit' or 'quit' to leave REPL[/dim]")
+            console.print("\n[dim]Use /exit or /quit to leave[/dim]")
             continue
         except EOFError:
             break
