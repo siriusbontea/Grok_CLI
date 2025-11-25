@@ -16,16 +16,51 @@
 ╚══════════════════════════════════════════════════════════════════════════════╝
 ```
 
-A natural language interface for Grok models. Just type what you want.
+A command-line interface for Grok models that reads, writes, and edits files directly on your filesystem.
 
-## Design Philosophy
+## Why a CLI?
 
-- **Natural language first**: Type naturally, the assistant understands context
-- **Safety by default**: Sandbox to launch directory, confirm before writing files
-- **Slash commands for utilities**: `/help`, `/model`, `/cost` for non-AI operations
-- **Progressive automation**: Interactive first, `-y/--yes` for automation
-- **Zero hidden state**: No per-project dotfiles or init commands
-- **Extensibility via plugins**: Core stays tiny, optional features in `~/.grok/plugins/`
+Browser-based AI interfaces cannot access your local files. This CLI can. It operates directly in your project directory, creating, modifying, and validating files as you describe them in plain language.
+
+**File Operations**
+- Create files from natural language descriptions ("write a Python script that...")
+- Edit existing files with automatic diff preview
+- Read and analyze any file in your project
+
+**Built-in Validation**
+
+Files are validated before saving. Syntax errors are caught and can be corrected automatically:
+
+| File Type | Validation |
+|-----------|------------|
+| Python (.py) | Syntax check + linting via ruff |
+| JSON (.json) | Parse validation |
+| YAML (.yaml) | Parse validation |
+| TOML (.toml) | Parse validation |
+| LaTeX (.tex) | chktex/pdflatex + environment matching |
+| JavaScript (.js) | Node.js syntax check |
+
+**Workflow**
+
+```
+You: "Create a Python script that calculates fibonacci numbers"
+      ↓
+CLI: Shows preview with syntax highlighting
+      ↓
+CLI: Validates Python syntax
+      ↓
+You: Approve, edit filename, or cancel
+      ↓
+CLI: Writes file to disk
+```
+
+## Design Principles
+
+- **Direct file access**: Read, write, and edit files in your project directory
+- **Validation before save**: Catch syntax errors before they reach disk
+- **Safety by default**: Preview all changes, sandboxed to launch directory
+- **Natural language**: No commands to memorize for file operations
+- **Progressive automation**: Interactive prompts, or `-y` flag for scripts
 
 ## Installation
 

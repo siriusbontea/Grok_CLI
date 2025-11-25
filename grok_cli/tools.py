@@ -10,8 +10,10 @@ from pathlib import Path
 from typing import Any
 
 from rich.console import Console
+from rich.panel import Panel
+from rich.prompt import Confirm, Prompt
 from rich.syntax import Syntax
-from rich.prompt import Confirm
+from rich.table import Table
 
 from grok_cli import sandbox
 from grok_cli.validators import validate_file
@@ -23,6 +25,38 @@ LARGE_FILE_THRESHOLD = 100
 
 # Max diff lines to show before truncating
 MAX_DIFF_LINES = 200
+
+# File type display names
+FILE_TYPE_NAMES: dict[str, str] = {
+    ".py": "Python",
+    ".js": "JavaScript",
+    ".mjs": "JavaScript (ES Module)",
+    ".ts": "TypeScript",
+    ".json": "JSON",
+    ".yaml": "YAML",
+    ".yml": "YAML",
+    ".toml": "TOML",
+    ".tex": "LaTeX",
+    ".latex": "LaTeX",
+    ".md": "Markdown",
+    ".txt": "Text",
+    ".html": "HTML",
+    ".css": "CSS",
+    ".sh": "Shell Script",
+    ".bash": "Bash Script",
+    ".sql": "SQL",
+    ".xml": "XML",
+    ".csv": "CSV",
+    ".ini": "INI Config",
+    ".cfg": "Config",
+    ".conf": "Config",
+}
+
+
+def _get_file_type_name(path: str) -> str:
+    """Get human-readable file type name."""
+    ext = Path(path).suffix.lower()
+    return FILE_TYPE_NAMES.get(ext, ext.lstrip(".").upper() if ext else "Text")
 
 # Diff display styles
 DIFF_STYLE_HEADER = "bold white"
@@ -260,7 +294,13 @@ def tool_read_file(path: str) -> dict[str, Any]:
 
 
 def tool_write_file(path: str, content: str, auto_confirm: bool = False) -> dict[str, Any]:
-    """Write content to a file with confirmation.
+    """Write content to a file with enhanced confirmation.
+
+    Features:
+    - Shows file info panel (name, type, lines, validation status)
+    - Allows filename editing before save
+    - Shows preview with syntax highlighting
+    - Validates content for supported file types
 
     Args:
         path: File path to write
@@ -271,7 +311,13 @@ def tool_write_file(path: str, content: str, auto_confirm: bool = False) -> dict
         Tool result dictionary
     """
     file_path = Path(path)
-    abs_path = sandbox.check_path_allowed(file_path, "write")
+    current_path = path  # Track potentially modified path
+
+    # Validate path
+    try:
+        abs_path = sandbox.check_path_allowed(file_path, "write")
+    except PermissionError as e:
+        return {"success": False, "error": str(e)}
 
     # Check if file exists
     file_exists = abs_path.exists()
@@ -279,70 +325,125 @@ def tool_write_file(path: str, content: str, auto_confirm: bool = False) -> dict
 
     # Detect file type for syntax highlighting
     suffix = abs_path.suffix.lstrip(".") or "text"
+    file_type = _get_file_type_name(path)
 
-    # Count lines for large file warning
+    # Count lines
     lines = content.count("\n") + 1
 
-    # Show preview
-    console.print(f"\n[bold]{action}:[/bold] {path}")
+    # Pre-validate to show status in header
+    validation = validate_file(content, path)
+    has_validator = validation is not None
+    validation_status = "Will validate" if has_validator else "No validator"
+    if validation and validation.has_errors:
+        validation_status = f"[red]{len(validation.errors)} error(s)[/red]"
+    elif validation and validation.warnings:
+        validation_status = f"[yellow]{len(validation.warnings)} warning(s)[/yellow]"
+    elif has_validator:
+        validation_status = "[green]Valid[/green]"
 
+    # Build file info panel
+    info_table = Table(show_header=False, box=None, padding=(0, 2))
+    info_table.add_column("label", style="dim")
+    info_table.add_column("value")
+    info_table.add_row("Filename:", f"[bold cyan]{path}[/bold cyan]")
+    info_table.add_row("Type:", file_type)
+    info_table.add_row("Lines:", str(lines))
+    info_table.add_row("Validation:", validation_status)
+
+    console.print()
+    console.print(Panel(info_table, title=f"[bold]{action} File[/bold]", border_style="blue"))
+
+    # Show preview
     if file_exists:
-        # Show diff for overwrites (red/green like edit_file)
+        # Show diff for overwrites
         old_content = abs_path.read_text()
         _show_diff(old_content, content, path)
     else:
         # Show content preview for new files
         if lines > LARGE_FILE_THRESHOLD:
             console.print(
-                f"[yellow]Warning: Large file ({lines} lines). Showing first {LARGE_FILE_THRESHOLD} lines.[/yellow]\n"
+                f"\n[yellow]Large file ({lines} lines). Showing first {LARGE_FILE_THRESHOLD}.[/yellow]\n"
             )
             preview_content = "\n".join(content.split("\n")[:LARGE_FILE_THRESHOLD])
             preview_content += f"\n... ({lines - LARGE_FILE_THRESHOLD} more lines)"
         else:
             preview_content = content
 
+        console.print()
         syntax = Syntax(preview_content, suffix, theme="monokai", line_numbers=True)
         console.print(syntax)
 
     console.print()
 
-    # Confirm
+    # Show validation errors if any
+    if validation and validation.has_errors:
+        console.print("[red]Validation errors:[/red]")
+        for err in validation.errors:
+            console.print(f"  [red]•[/red] {err}")
+    if validation and validation.warnings:
+        console.print("[yellow]Warnings:[/yellow]")
+        for warn in validation.warnings:
+            console.print(f"  [yellow]•[/yellow] {warn}")
+        console.print()
+
+    # Confirmation with filename editing option
     if not auto_confirm:
-        if not Confirm.ask(f"{action} this file?", default=False):
-            return {"success": False, "error": "User cancelled"}
+        while True:
+            choice = Prompt.ask(
+                f"Save as '[cyan]{current_path}[/cyan]'?",
+                choices=["y", "n", "e"],
+                default="y",
+                show_choices=True,
+            )
+
+            if choice == "n":
+                return {"success": False, "error": "User cancelled"}
+            elif choice == "e":
+                # Edit filename
+                new_name = Prompt.ask("Enter new filename", default=current_path)
+                new_name = new_name.strip()
+                if new_name and new_name != current_path:
+                    try:
+                        new_abs_path = sandbox.check_path_allowed(Path(new_name), "write")
+                        current_path = new_name
+                        abs_path = new_abs_path
+                        file_exists = abs_path.exists()
+                        action = "Overwrite" if file_exists else "Create"
+                        # Re-validate with new extension if changed
+                        if Path(new_name).suffix != Path(path).suffix:
+                            validation = validate_file(content, new_name)
+                            if validation and validation.has_errors:
+                                console.print(f"[yellow]Note: Validation for {new_name}:[/yellow]")
+                                for err in validation.errors:
+                                    console.print(f"  [red]•[/red] {err}")
+                        console.print(f"[dim]Filename changed to: {current_path}[/dim]")
+                    except PermissionError as e:
+                        console.print(f"[red]Invalid path:[/red] {e}")
+                        continue
+            else:  # 'y'
+                break
 
     # Create parent directories if needed
     abs_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Validate content before writing (for supported file types)
-    validation = validate_file(content, path)
-    if validation and validation.has_errors:
-        # Show validation errors
-        console.print(f"\n[red]Validation errors found in {path}:[/red]")
-        for err in validation.errors:
-            console.print(f"  [red]•[/red] {err}")
-        if validation.warnings:
-            for warn in validation.warnings:
-                console.print(f"  [yellow]•[/yellow] {warn}")
-
-        # Ask if user wants to save anyway
-        if not auto_confirm:
-            if not Confirm.ask("Save file anyway despite errors?", default=False):
-                return {
-                    "success": False,
-                    "error": f"Validation failed:\n{validation.format_report()}",
-                }
+    # Final validation check - ask about errors
+    if validation and validation.has_errors and not auto_confirm:
+        if not Confirm.ask("Save despite validation errors?", default=False):
+            return {
+                "success": False,
+                "error": f"Validation failed:\n{validation.format_report()}",
+            }
 
     # Write file
     abs_path.write_text(content)
-    console.print(f"[green]✓[/green] {action}d: {path}")
+    console.print(f"[green]✓[/green] {action}d: {current_path}")
 
     # Return validation info in result if there were issues
     if validation and (validation.errors or validation.warnings):
-        result_msg = f"Wrote {len(content)} bytes to {path}, but validation found issues:\n{validation.format_report()}"
+        result_msg = f"Wrote {len(content)} bytes to {current_path}, but validation found issues:\n{validation.format_report()}"
         return {"success": True, "result": result_msg, "validation_errors": validation.errors}
 
-    return {"success": True, "result": f"Successfully wrote {len(content)} bytes to {path}"}
+    return {"success": True, "result": f"Successfully wrote {len(content)} bytes to {current_path}"}
 
 
 def tool_edit_file(path: str, old_text: str, new_text: str, auto_confirm: bool = False) -> dict[str, Any]:
