@@ -3,6 +3,7 @@
 Implements Typer app and prompt_toolkit REPL.
 """
 
+import os
 import sys
 from typing import Optional
 
@@ -55,6 +56,10 @@ def main(
 
     # Load configuration (creates default on first run)
     cfg = config.load_config()
+
+    # Honour colour = false by setting NO_COLOR (Rich reads this natively)
+    if not cfg.get("colour", True):
+        os.environ["NO_COLOR"] = "1"
 
     # Discover plugins and bridge their commands into slash commands
     from grok_cli.plugins import discover_plugins
@@ -146,35 +151,46 @@ def ask(
 
 
 @app.command()
-def resume(ctx: typer.Context) -> None:
+def resume(
+    ctx: typer.Context,
+    new: bool = typer.Option(False, "--new", help="Start a new session (clear previous context)"),
+) -> None:
     """Resume last session and enter interactive mode."""
     cfg = ctx.obj["cfg"]
-    from grok_cli.commands.utility import resume_command
-    from grok_cli import session as sess
 
-    try:
-        session_data = resume_command(cfg)
-        if session_data:
-            # Write session data to context.toon so the REPL picks it up
-            context_path = config.get_project_dir() / "context.toon"
-            # Extract messages from session data (handles both compressed and uncompressed)
-            toon_text = sess.serialize_toon(session_data)
-            messages = sess.toon_to_messages(toon_text)
-            if messages:
-                context_path.write_text(sess.messages_to_toon(messages))
-            else:
-                # Compressed session with history key — inject as system context
-                history = session_data.get("history", "")
-                if history:
-                    history_str = ", ".join(history) if isinstance(history, list) else str(history)
-                    context_path.write_text(
-                        sess.messages_to_toon(
-                            [{"role": "system", "content": f"Previous session summary: {history_str}"}]
+    if new:
+        # --new: delete context.toon so the REPL starts fresh
+        context_path = config.get_project_dir() / "context.toon"
+        if context_path.exists():
+            context_path.unlink()
+        console.print("[green]Starting fresh session.[/green]")
+    else:
+        from grok_cli.commands.utility import resume_command
+        from grok_cli import session as sess
+
+        try:
+            session_data = resume_command(cfg)
+            if session_data:
+                # Write session data to context.toon so the REPL picks it up
+                context_path = config.get_project_dir() / "context.toon"
+                # Extract messages from session data (handles both compressed and uncompressed)
+                toon_text = sess.serialize_toon(session_data)
+                messages = sess.toon_to_messages(toon_text)
+                if messages:
+                    context_path.write_text(sess.messages_to_toon(messages))
+                else:
+                    # Compressed session with history key — inject as system context
+                    history = session_data.get("history", "")
+                    if history:
+                        history_str = ", ".join(history) if isinstance(history, list) else str(history)
+                        context_path.write_text(
+                            sess.messages_to_toon(
+                                [{"role": "system", "content": f"Previous session summary: {history_str}"}]
+                            )
                         )
-                    )
-    except Exception as e:
-        console.print(f"[bold red]Error:[/bold red] {e}")
-        raise typer.Exit(1)
+        except Exception as e:
+            console.print(f"[bold red]Error:[/bold red] {e}")
+            raise typer.Exit(1)
 
     from grok_cli.repl import start_repl
 

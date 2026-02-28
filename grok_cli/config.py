@@ -23,6 +23,7 @@ DEFAULT_CONFIG = {
     "auto_yes": False,
     "colour": True,
     "lean_mode": False,  # true → minimal comments in generated code
+    "compact_mode": False,  # true → hide stats after each response
     "budget_monthly": 0.0,  # 0 = disabled
     "web_daily_quota": 100000,  # tokens via web plugin, 0 = disabled
 }
@@ -135,6 +136,10 @@ def create_default_config() -> None:
     doc.add(comment("Lean mode: minimal comments in generated code"))
     doc.add(comment("Set to true or use GROK_LEAN=1 environment variable"))
     doc["lean_mode"] = DEFAULT_CONFIG["lean_mode"]
+    doc.add(nl())
+
+    doc.add(comment("Compact mode: hide stats after each response"))
+    doc["compact_mode"] = DEFAULT_CONFIG["compact_mode"]
     doc.add(nl())
 
     doc.add(comment("Monthly budget limit in USD (0 = disabled)"))

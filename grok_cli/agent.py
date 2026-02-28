@@ -217,7 +217,8 @@ class Agent:
             # Estimate tokens from loaded messages
             self.total_tokens = sum(len(m.get("content", "")) // 4 for m in self.messages)
             return len(self.messages) > 0
-        except Exception:
+        except Exception as e:
+            console.print(f"[yellow]Warning: Could not load saved context ({e}). Starting fresh.[/yellow]")
             return False
 
     def has_saved_context(self) -> bool:

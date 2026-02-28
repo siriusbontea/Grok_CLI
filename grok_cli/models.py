@@ -99,7 +99,10 @@ def is_reasoning_model(model: str) -> bool:
     Returns:
         True if model uses reasoning
     """
-    api_model = resolve_model_name(model)
+    try:
+        api_model = resolve_model_name(model)
+    except ValueError:
+        return False
     # Check for "-reasoning" suffix but not "non-reasoning"
     return "reasoning" in api_model and "non-reasoning" not in api_model
 
