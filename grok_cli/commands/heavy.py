@@ -61,8 +61,13 @@ def heavy_command(task: str, session_context: dict[str, Any] | None, cfg: dict[s
     console.print("[bold cyan]Heavy Mode:[/bold cyan] Running 3 parallel agents + meta-resolver...\n")
 
     # Run 3 agents in parallel
-    with console.status("[bold green]Agent A (Coder)...", spinner="dots"):
+    with console.status("[bold green]Running 3 agents in parallel...", spinner="dots"):
         agent_responses = _run_parallel_agents(provider, task, context_str, budget_monthly)
+
+    # Check that at least one agent succeeded before running meta-resolver
+    valid_responses = {k: v for k, v in agent_responses.items() if not v.startswith("[Agent error:")}
+    if not valid_responses:
+        raise ValueError("All 3 agents failed. Check your API key and network connection.")
 
     # Run meta-resolver
     with console.status("[bold green]Meta-resolver synthesizing...", spinner="dots"):

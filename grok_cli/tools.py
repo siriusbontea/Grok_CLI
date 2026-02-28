@@ -105,9 +105,9 @@ def _show_diff(old_content: str, new_content: str, path: str) -> None:
 
     console.print()
 
-    # Track line numbers
-    old_line_num = 0
-    new_line_num = 0
+    # Track line numbers (1-based, overridden by @@ hunk headers)
+    old_line_num = 1
+    new_line_num = 1
 
     # Get terminal width for full-line highlighting
     term_width = console.width or 80

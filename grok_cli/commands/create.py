@@ -43,6 +43,8 @@ DEFAULT_EXTENSIONS = {
     "cpp": "cpp",
     "h": "h",
     "hpp": "hpp",
+    "tex": "tex",
+    "latex": "tex",
 }
 
 

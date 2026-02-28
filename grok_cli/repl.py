@@ -252,9 +252,6 @@ def start_repl(cfg: dict[str, Any]) -> None:
             # Response is streamed directly by the agent
             try:
                 agent.chat(line)
-            except ValueError as e:
-                # API key not set or other config error
-                console.print(f"[red]Error:[/red] {e}")
             except Exception as e:
                 console.print(f"[red]Error:[/red] {e}")
 

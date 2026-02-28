@@ -143,28 +143,26 @@ def _prune_cache_if_needed() -> None:
     # Sort by modification time (oldest first)
     cache_files.sort(key=lambda f: f.stat().st_mtime)
 
-    # Delete files older than 30 days
-    cutoff_time = time.time() - (30 * 24 * 60 * 60)  # 30 days in seconds
-    for cache_file in cache_files[:]:
+    # Gather stats once to avoid repeated stat() calls and O(n²) list.remove()
+    file_entries: list[tuple[Path, float, int]] = []
+    for cache_file in cache_files:
         try:
-            file_stat = cache_file.stat()
-            if file_stat.st_mtime < cutoff_time:
-                file_size = file_stat.st_size
-                cache_file.unlink()
-                cache_files.remove(cache_file)
-                total_size -= file_size
-        except Exception:
-            pass
+            st = cache_file.stat()
+            file_entries.append((cache_file, st.st_mtime, st.st_size))
+        except OSError:
+            pass  # File disappeared between glob and stat
 
-    # Delete oldest files until under size limit
-    while total_size > max_size and cache_files:
-        oldest_file = cache_files.pop(0)
-        try:
-            file_size = oldest_file.stat().st_size
-            oldest_file.unlink()
-            total_size -= file_size
-        except Exception:
-            pass
+    file_entries.sort(key=lambda e: e[1])  # oldest first
+
+    # Delete expired or over-budget files (oldest first)
+    cutoff_time = time.time() - (30 * 24 * 60 * 60)  # 30 days in seconds
+    for path, mtime, size in file_entries:
+        if mtime < cutoff_time or total_size > max_size:
+            try:
+                path.unlink()
+                total_size -= size
+            except OSError:
+                pass
 
 
 def get_cache_stats() -> dict[str, Any]:

@@ -26,6 +26,7 @@ DEFAULT_CONFIG = {
     "compact_mode": False,  # true → hide stats after each response
     "budget_monthly": 0.0,  # 0 = disabled
     "web_daily_quota": 100000,  # tokens via web plugin, 0 = disabled
+    "theme": "default",  # color theme (default, ocean, forest, sunset, minimal)
 }
 
 # Store the launch directory (set by sandbox.init_sandbox)
@@ -148,6 +149,10 @@ def create_default_config() -> None:
 
     doc.add(comment("Daily token quota for web plugin (0 = disabled)"))
     doc["web_daily_quota"] = DEFAULT_CONFIG["web_daily_quota"]
+    doc.add(nl())
+
+    doc.add(comment("Color theme (default | ocean | forest | sunset | minimal)"))
+    doc["theme"] = DEFAULT_CONFIG["theme"]
 
     # Write to file
     config_path.write_text(tomlkit.dumps(doc), encoding="utf-8")
