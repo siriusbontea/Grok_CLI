@@ -87,3 +87,46 @@ def test_sandbox_always_enforced():
 
     with pytest.raises(PermissionError):
         sandbox.check_path_allowed(test_path, "read")
+
+
+def test_enable_full_fs_access():
+    """Test that enable_full_fs_access allows paths outside launch dir."""
+    sandbox.init_sandbox()
+
+    try:
+        sandbox.enable_full_fs_access()
+
+        # Path outside cwd should now be allowed
+        test_path = Path("/tmp/test.txt")
+        resolved = sandbox.check_path_allowed(test_path, "read")
+        assert resolved == test_path.resolve()
+    finally:
+        sandbox._ALLOW_ENTIRE_FS = False
+
+
+def test_is_full_fs_enabled():
+    """Test that is_full_fs_enabled returns correct state."""
+    sandbox.init_sandbox()
+
+    try:
+        assert sandbox.is_full_fs_enabled() is False
+        sandbox.enable_full_fs_access()
+        assert sandbox.is_full_fs_enabled() is True
+    finally:
+        sandbox._ALLOW_ENTIRE_FS = False
+
+
+def test_set_current_dir_bypass():
+    """Test that set_current_dir works outside launch dir when bypass enabled."""
+    sandbox.init_sandbox()
+
+    try:
+        sandbox.enable_full_fs_access()
+
+        # Should not raise even though /tmp is outside launch dir
+        sandbox.set_current_dir(Path("/tmp"))
+        assert sandbox.get_current_dir() == Path("/tmp").resolve()
+    finally:
+        sandbox._ALLOW_ENTIRE_FS = False
+        # Reset current dir back to launch dir
+        sandbox.CURRENT_DIR = sandbox.LAUNCH_DIR

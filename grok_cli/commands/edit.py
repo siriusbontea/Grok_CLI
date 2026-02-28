@@ -8,6 +8,7 @@ from rich.console import Console
 from rich.prompt import Prompt
 
 from grok_cli import cache, config, sandbox
+from grok_cli.budget import record_and_warn
 from grok_cli.providers.grok import GrokProvider
 from grok_cli.models import resolve_model_name
 
@@ -138,8 +139,13 @@ def edit_command(filename: str, instruction: str, cfg: dict[str, Any], auto_yes:
         # Cache the response
         cache.cache_response(messages, model, 0.7, response)
 
-        # Show token usage
+        # Track budget
         usage = response.get("usage", {})
+        prompt_tokens = usage.get("prompt_tokens", 0)
+        completion_tokens = usage.get("completion_tokens", 0)
+        record_and_warn(model, prompt_tokens, completion_tokens, cfg.get("budget_monthly", 0.0))
+
+        # Show token usage
         tokens = usage.get("total_tokens", 0)
         console.print(f"[dim]Tokens: {tokens}[/dim]")
 

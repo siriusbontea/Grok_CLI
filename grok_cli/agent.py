@@ -14,6 +14,7 @@ from rich.console import Console
 from rich.markdown import Markdown
 
 from grok_cli import config, sandbox, session
+from grok_cli.budget import record_and_warn
 from grok_cli.session import compute_files_hash
 from grok_cli.models import resolve_model_name
 from grok_cli.providers.grok import GrokProvider
@@ -284,6 +285,15 @@ class Agent:
                     max_tokens=8192,
                 )
 
+            # Track budget for non-streaming call
+            if hasattr(response, "usage") and response.usage:
+                record_and_warn(
+                    model,
+                    response.usage.prompt_tokens,
+                    response.usage.completion_tokens,
+                    self.cfg.get("budget_monthly", 0.0),
+                )
+
             choice = response.choices[0]
             assistant_message = choice.message
 
@@ -398,6 +408,11 @@ class Agent:
 
             # Store for /copy command
             self.last_response = final_content
+
+            # Track budget (estimate since streaming doesn't return usage)
+            estimated_prompt = len(user_message) // 4
+            estimated_completion = len(final_content) // 4
+            record_and_warn(model, estimated_prompt, estimated_completion, self.cfg.get("budget_monthly", 0.0))
 
             # Update token count (estimate since streaming doesn't give usage)
             self.total_tokens += len(final_content) // 4 + len(user_message) // 4

@@ -16,6 +16,20 @@ MODEL_MAP = {
     "grok2_image": "grok-2-image-1212",
 }
 
+# Pricing per 1M tokens: (input_cost_usd, output_cost_usd)
+MODEL_PRICING: dict[str, tuple[float, float]] = {
+    "grok-4-1-fast-non-reasoning": (0.20, 0.50),
+    "grok-4-1-fast-reasoning": (0.20, 0.50),
+    "grok-4-fast-non-reasoning": (0.20, 0.50),
+    "grok-4-fast-reasoning": (0.20, 0.50),
+    "grok-code-fast-1": (0.20, 1.50),
+    "grok-4": (3.00, 15.00),
+    "grok-2-image-1212": (2.00, 10.00),
+}
+
+# Fallback pricing for unknown models
+DEFAULT_PRICING: tuple[float, float] = (3.00, 15.00)
+
 # Reverse mapping (API string → user-friendly name)
 REVERSE_MODEL_MAP = {v: k for k, v in MODEL_MAP.items()}
 
@@ -58,6 +72,22 @@ def get_friendly_name(api_model: str) -> str:
         User-friendly name or API string if no mapping
     """
     return REVERSE_MODEL_MAP.get(api_model, api_model)
+
+
+def get_model_pricing(model: str) -> tuple[float, float]:
+    """Get pricing per 1M tokens for a model.
+
+    Args:
+        model: API model string or friendly name
+
+    Returns:
+        Tuple of (input_cost_per_1M, output_cost_per_1M) in USD
+    """
+    try:
+        api_model = resolve_model_name(model)
+    except ValueError:
+        api_model = model
+    return MODEL_PRICING.get(api_model, DEFAULT_PRICING)
 
 
 def is_reasoning_model(model: str) -> bool:

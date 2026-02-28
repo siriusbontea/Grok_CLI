@@ -7,6 +7,7 @@ from rich.console import Console
 from rich.markdown import Markdown
 
 from grok_cli import config
+from grok_cli.budget import record_and_warn
 from grok_cli.providers.grok import GrokProvider
 from grok_cli.session import serialize_toon
 
@@ -55,26 +56,31 @@ def heavy_command(task: str, session_context: dict[str, Any] | None, cfg: dict[s
     if session_context:
         context_str = f"Context from session:\n{serialize_toon(session_context)}\n\n"
 
+    budget_monthly = cfg.get("budget_monthly", 0.0)
+
     console.print("[bold cyan]Heavy Mode:[/bold cyan] Running 3 parallel agents + meta-resolver...\n")
 
     # Run 3 agents in parallel
     with console.status("[bold green]Agent A (Coder)...", spinner="dots"):
-        agent_responses = _run_parallel_agents(provider, task, context_str)
+        agent_responses = _run_parallel_agents(provider, task, context_str, budget_monthly)
 
     # Run meta-resolver
     with console.status("[bold green]Meta-resolver synthesizing...", spinner="dots"):
-        final_response = _run_meta_resolver(provider, task, agent_responses)
+        final_response = _run_meta_resolver(provider, task, agent_responses, budget_monthly)
 
     return final_response
 
 
-def _run_parallel_agents(provider: GrokProvider, task: str, context_str: str) -> dict[str, str]:
+def _run_parallel_agents(
+    provider: GrokProvider, task: str, context_str: str, budget_monthly: float
+) -> dict[str, str]:
     """Run 3 agents in parallel with different roles.
 
     Args:
         provider: Grok provider instance
         task: Task description
         context_str: Context string from session (TOON format)
+        budget_monthly: Monthly budget in USD (0 = disabled)
 
     Returns:
         Dictionary of agent_name → response
@@ -106,16 +112,28 @@ def _run_parallel_agents(provider: GrokProvider, task: str, context_str: str) ->
             responses[agent_name] = response["content"]
             console.print(f"[green]✓[/green] Agent {agent_name.upper()}: {len(response['content'])} chars")
 
+            # Track budget for each parallel agent
+            usage = response.get("usage", {})
+            record_and_warn(
+                REASONING_MODEL,
+                usage.get("prompt_tokens", 0),
+                usage.get("completion_tokens", 0),
+                budget_monthly,
+            )
+
     return responses
 
 
-def _run_meta_resolver(provider: GrokProvider, task: str, agent_responses: dict[str, str]) -> str:
+def _run_meta_resolver(
+    provider: GrokProvider, task: str, agent_responses: dict[str, str], budget_monthly: float
+) -> str:
     """Run meta-resolver to synthesize agent responses.
 
     Args:
         provider: Grok provider instance
         task: Original task
         agent_responses: Responses from each agent
+        budget_monthly: Monthly budget in USD (0 = disabled)
 
     Returns:
         Final synthesized response
@@ -144,8 +162,16 @@ def _run_meta_resolver(provider: GrokProvider, task: str, agent_responses: dict[
 
     console.print(f"[green]✓[/green] Meta-resolver: {len(response['content'])} chars")
 
-    # Show total token usage
+    # Track budget for meta-resolver
     usage = response.get("usage", {})
+    record_and_warn(
+        REASONING_MODEL,
+        usage.get("prompt_tokens", 0),
+        usage.get("completion_tokens", 0),
+        budget_monthly,
+    )
+
+    # Show total token usage
     # Note: This is just the meta-resolver usage, actual total is ~3.5× this
     console.print(f"\n[dim]Meta-resolver tokens: {usage.get('total_tokens', 0)}[/dim]")
     console.print("[dim]Total cost ≈ 3.5× single call[/dim]\n")

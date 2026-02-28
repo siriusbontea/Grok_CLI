@@ -327,22 +327,45 @@ def cmd_models(args: list[str], cfg: dict[str, Any], agent: Any) -> None:
 
 def cmd_cost(args: list[str], cfg: dict[str, Any], agent: Any) -> None:
     """Show token usage dashboard."""
+    from grok_cli.budget import get_tracker
+
     console.print("\n[bold]Token Usage Dashboard:[/bold]\n")
 
-    stats = cache.get_cache_stats()
-    sessions_list = session.list_sessions()
+    # Budget tracking data
+    tracker = get_tracker()
+    summary = tracker.get_summary()
 
     table = Table(show_header=False, box=None)
     table.add_column("Metric", style="cyan")
     table.add_column("Value", style="green")
 
-    table.add_row("Cached Responses", str(stats["file_count"]))
-    table.add_row("Cache Size", f"{stats['total_size_mb']:.2f} MB")
-    table.add_row("Oldest Cache", f"{stats['oldest_age_days']:.1f} days")
-    table.add_row("Sessions Saved", str(len(sessions_list)))
+    table.add_row("Month", summary["month"])
+    table.add_row("Total Cost", f"${summary['total_cost_usd']:.4f}")
+    table.add_row("API Calls", str(summary["calls"]))
+    table.add_row("Prompt Tokens", f"{summary['total_prompt_tokens']:,}")
+    table.add_row("Completion Tokens", f"{summary['total_completion_tokens']:,}")
+
+    # Budget ratio with color coding
+    budget = cfg.get("budget_monthly", 0.0)
+    if budget > 0:
+        ratio = summary["total_cost_usd"] / budget
+        if ratio >= 1.0:
+            color = "red"
+        elif ratio >= 0.8:
+            color = "yellow"
+        else:
+            color = "green"
+        table.add_row("Budget", f"[{color}]${summary['total_cost_usd']:.2f} / ${budget:.2f} ({ratio:.0%})[/{color}]")
+    else:
+        table.add_row("Budget", "[dim]Disabled (set budget_monthly in config.toml)[/dim]")
 
     console.print(table)
-    console.print("\n[dim]Note: Detailed cost tracking requires budget_monthly in config.toml[/dim]\n")
+
+    # Cache stats
+    stats = cache.get_cache_stats()
+    sessions_list = session.list_sessions()
+    console.print(f"\n[dim]Cache: {stats['file_count']} responses ({stats['total_size_mb']:.2f} MB) | "
+                  f"Sessions: {len(sessions_list)}[/dim]\n")
 
 
 def cmd_clear(args: list[str], cfg: dict[str, Any], agent: Any) -> None:

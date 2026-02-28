@@ -25,6 +25,11 @@ console = Console()
 def main(
     ctx: typer.Context,
     yes: bool = typer.Option(False, "-y", "--yes", help="Auto-confirm file operations (skip prompts)"),
+    allow_entire_fs: bool = typer.Option(
+        False,
+        "--dangerously-allow-entire-fs",
+        help="Disable sandbox (allows access to entire filesystem, requires typing YES)",
+    ),
 ) -> None:
     """Grok CLI - Natural language interface for Grok models.
 
@@ -33,6 +38,20 @@ def main(
     """
     # Initialize sandbox (always enforced, cannot be disabled)
     sandbox.init_sandbox()
+
+    # Handle --dangerously-allow-entire-fs flag
+    if allow_entire_fs:
+        console.print(
+            "\n[bold red]WARNING: You are about to disable the filesystem sandbox.[/bold red]\n"
+            "This allows Grok to read, write, and modify ANY file on your system.\n"
+            "This is dangerous and should only be used when you understand the risks.\n"
+        )
+        confirmation = console.input("[bold]Type YES to confirm: [/bold]")
+        if confirmation == "YES":
+            sandbox.enable_full_fs_access()
+            console.print("[yellow]Sandbox disabled. Full filesystem access enabled.[/yellow]\n")
+        else:
+            console.print("[green]Sandbox remains active.[/green]\n")
 
     # Load configuration (creates default on first run)
     cfg = config.load_config()
@@ -63,6 +82,11 @@ def main(
         else:
             # Regular run: just show the ASCII art banner
             show_banner()
+
+        if sandbox.is_full_fs_enabled():
+            console.print(
+                "[bold red on white] ⚠ SANDBOX DISABLED — FULL FILESYSTEM ACCESS ⚠ [/bold red on white]\n"
+            )
 
         from grok_cli.repl import start_repl
 

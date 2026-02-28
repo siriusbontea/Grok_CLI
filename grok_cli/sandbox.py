@@ -1,7 +1,7 @@
 """Sandbox enforcement for safe file operations.
 
-All file operations are strictly restricted to the launch directory.
-This cannot be disabled - safety is mandatory.
+All file operations are strictly restricted to the launch directory
+unless --dangerously-allow-entire-fs is used with typed YES confirmation.
 """
 
 from pathlib import Path
@@ -14,7 +14,29 @@ LAUNCH_DIR = Path.cwd().resolve()
 # Current directory - updated by cd command, starts at LAUNCH_DIR
 CURRENT_DIR = LAUNCH_DIR
 
+# Full filesystem bypass (requires --dangerously-allow-entire-fs + typed YES)
+_ALLOW_ENTIRE_FS: bool = False
+
 console = Console()
+
+
+def enable_full_fs_access() -> None:
+    """Enable full filesystem access, bypassing the sandbox.
+
+    This should only be called after the user explicitly types YES
+    in response to the --dangerously-allow-entire-fs flag.
+    """
+    global _ALLOW_ENTIRE_FS
+    _ALLOW_ENTIRE_FS = True
+
+
+def is_full_fs_enabled() -> bool:
+    """Check if full filesystem access is enabled.
+
+    Returns:
+        True if sandbox is bypassed
+    """
+    return _ALLOW_ENTIRE_FS
 
 
 def init_sandbox() -> None:
@@ -62,6 +84,11 @@ def set_current_dir(path: Path) -> None:
 
     resolved = path.resolve()
 
+    # Bypass sandbox check if full filesystem access is enabled
+    if _ALLOW_ENTIRE_FS:
+        CURRENT_DIR = resolved
+        return
+
     # Check if new path is within launch directory
     try:
         resolved.relative_to(LAUNCH_DIR)
@@ -89,6 +116,10 @@ def check_path_allowed(path: Path, operation: str = "access") -> Path:
         path = CURRENT_DIR / path
 
     resolved = path.resolve()
+
+    # Bypass sandbox check if full filesystem access is enabled
+    if _ALLOW_ENTIRE_FS:
+        return resolved
 
     # Check if path is within launch directory
     try:
