@@ -120,6 +120,11 @@ class GrokCompleter(Completer):
             # Get completions from the sandbox directory
             try:
                 cwd = sandbox.get_current_dir()
+
+                # Block absolute paths — they bypass the sandbox and leak filesystem info
+                if current_word.startswith("/"):
+                    return
+
                 search_path = cwd / current_word if current_word else cwd
 
                 # If partial path, get the directory part

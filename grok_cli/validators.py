@@ -97,7 +97,10 @@ def validate_python(content: str, filename: str = "file.py") -> ValidationResult
 
             py_compile.compile(temp_path, doraise=True)
         except py_compile.PyCompileError as e:
-            errors.append(f"Syntax error: {e.msg}")
+            # Replace temp file path with the original filename in the error
+            msg = str(e.msg) if e.msg else str(e)
+            msg = msg.replace(temp_path, filename)
+            errors.append(f"Syntax error: {msg}")
 
         # If ruff is available, run it for additional checks
         if _check_command_exists("ruff"):
@@ -112,14 +115,12 @@ def validate_python(content: str, filename: str = "file.py") -> ValidationResult
                     # Parse ruff output - each line is an issue
                     for line in result.stdout.strip().split("\n"):
                         if line and temp_path in line:
-                            # Extract just the error part
-                            parts = line.split(temp_path)
-                            if len(parts) > 1:
-                                issue = parts[1].lstrip(":").strip()
-                                if "error" in line.lower():
-                                    errors.append(issue)
-                                else:
-                                    warnings.append(issue)
+                            # Replace temp path with original filename
+                            issue = line.replace(temp_path, filename)
+                            if "error" in line.lower():
+                                errors.append(issue)
+                            else:
+                                warnings.append(issue)
             except subprocess.TimeoutExpired:
                 warnings.append("ruff timed out")
             except Exception:
@@ -345,10 +346,10 @@ def validate_javascript(content: str, filename: str = "file.js") -> ValidationRe
             timeout=10,
         )
         if result.returncode != 0:
-            # Parse node error output
+            # Parse node error output, replacing temp path with original filename
             for line in result.stderr.strip().split("\n"):
                 if line.strip():
-                    errors.append(line.strip())
+                    errors.append(line.strip().replace(temp_path, filename))
     except subprocess.TimeoutExpired:
         return ValidationResult(valid=True, errors=[], warnings=["node --check timed out"])
     finally:

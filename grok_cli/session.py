@@ -54,8 +54,9 @@ def parse_toon(text: str) -> dict[str, str | list[str]]:
             value += "\n" + continuation
             i += 1
 
-        # Detect list (comma-separated, no commas in multi-line values)
-        if "," in value and "\n" not in value:
+        # Detect list: only when commas have no trailing space (serialize uses ",")
+        # This avoids corrupting code like "f(a, b, c)" or "import os, sys"
+        if "," in value and "\n" not in value and ", " not in value:
             data[key] = [v.strip() for v in value.split(",") if v.strip()]
         else:
             data[key] = value
@@ -281,7 +282,7 @@ def save_session(data: dict[str, Any], compress_mode: str = "smart") -> Path:
     compressed_data = compress_session(data, compress_mode)
 
     # Generate filename with timestamp
-    timestamp = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
     session_file = sessions_dir / f"{timestamp}.toon"
 
     # Save to file

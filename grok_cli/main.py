@@ -182,13 +182,15 @@ def resume(
                 if messages:
                     context_path.write_text(sess.messages_to_toon(messages))
                 else:
-                    # Compressed session with history key — inject as system context
+                    # Compressed session with history key — inject as user context note
+                    # Use "user" role, not "system", because mid-conversation system
+                    # messages are invalid for the Grok/OpenAI API.
                     history = session_data.get("history", "")
                     if history:
                         history_str = ", ".join(history) if isinstance(history, list) else str(history)
                         context_path.write_text(
                             sess.messages_to_toon(
-                                [{"role": "system", "content": f"Previous session summary: {history_str}"}]
+                                [{"role": "user", "content": f"[Previous session context] {history_str}"}]
                             )
                         )
         except Exception as e:
