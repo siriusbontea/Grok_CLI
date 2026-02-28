@@ -615,6 +615,43 @@ def cmd_theme(args: list[str], cfg: dict[str, Any], agent: Any) -> None:
     console.print("[dim]Theme will be applied on next prompt[/dim]")
 
 
+def cmd_heavy(args: list[str], cfg: dict[str, Any], agent: Any) -> None:
+    """Run parallel agents + meta-resolver for complex tasks."""
+    if not args:
+        console.print("[yellow]Usage:[/yellow] /heavy <task description>")
+        console.print("[dim]Example: /heavy explain the factory pattern in Python[/dim]")
+        return
+
+    from grok_cli.commands.heavy import heavy_command, display_heavy_result
+
+    task = " ".join(args)
+
+    # Build lightweight session context from recent agent messages
+    session_context: dict[str, Any] | None = None
+    if agent and agent.messages:
+        session_context = {}
+        recent = agent.messages[-6:]  # Last 3 exchanges
+        for i, msg in enumerate(recent):
+            role = msg.get("role", "unknown")
+            content = msg.get("content", "")
+            session_context[f"turn_{i:03d}_{role}"] = content
+
+    try:
+        result = heavy_command(task, session_context, cfg)
+        display_heavy_result(result)
+
+        # Append to agent messages for continuity
+        if agent:
+            agent.messages.append({"role": "user", "content": f"[heavy mode] {task}"})
+            agent.messages.append({"role": "assistant", "content": result})
+            agent.save_context()
+
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}")
+    except Exception as e:
+        console.print(f"[red]Error running heavy mode:[/red] {e}")
+
+
 # --- Register Commands ---
 
 register_slash_command("help", cmd_help, "Show help information", "/help [topic]")
@@ -636,3 +673,25 @@ register_slash_command("compact", cmd_compact, "Toggle compact mode (hide stats)
 register_slash_command("save", cmd_save, "Save conversation", "/save [name]")
 register_slash_command("resume", cmd_resume, "Resume saved conversation", "/resume [name]")
 register_slash_command("theme", cmd_theme, "Set color theme", "/theme [name]")
+register_slash_command("heavy", cmd_heavy, "Run parallel agents + meta-resolver", "/heavy <task>")
+
+
+def bridge_plugin_commands() -> None:
+    """Register plugin commands as slash commands.
+
+    Iterates over commands registered by plugins and wraps each callback
+    into the slash command handler signature (args, cfg, agent).
+    Skips names that collide with already-registered built-in commands.
+    """
+    plugin_commands = get_registered_commands()
+    for name, (callback, help_text) in plugin_commands.items():
+        if name in SLASH_COMMANDS:
+            continue  # Don't override built-in commands
+
+        def _make_handler(cb: Any) -> Callable[..., Any]:
+            """Factory to capture the callback in a closure."""
+            def handler(args: list[str], cfg: dict[str, Any], agent: Any) -> None:
+                cb(" ".join(args) if args else "")
+            return handler
+
+        register_slash_command(name, _make_handler(callback), help_text, f"/{name} [args]")

@@ -52,9 +52,6 @@ class GrokCompleter(Completer):
 
     def __init__(self) -> None:
         """Initialize completer."""
-        # Slash commands
-        self.slash_commands = [f"/{cmd}" for cmd in SLASH_COMMANDS.keys()]
-        self.slash_commands.extend(["/exit", "/quit", "/q"])
 
         # Shell commands that take file arguments
         self.shell_commands = [
@@ -91,9 +88,11 @@ class GrokCompleter(Completer):
         text = document.text_before_cursor
         stripped = text.strip()
 
-        # Slash command completion
+        # Slash command completion (read dynamically so plugin commands appear)
         if stripped.startswith("/"):
-            for cmd in self.slash_commands:
+            slash_commands = [f"/{cmd}" for cmd in SLASH_COMMANDS.keys()]
+            slash_commands.extend(["/exit", "/quit", "/q"])
+            for cmd in slash_commands:
                 if cmd.startswith(stripped):
                     yield Completion(cmd, start_position=-len(stripped))
             return

@@ -36,6 +36,13 @@ def main(
     # Load configuration (creates default on first run)
     cfg = config.load_config()
 
+    # Discover plugins and bridge their commands into slash commands
+    from grok_cli.plugins import discover_plugins
+    from grok_cli.slash_commands import bridge_plugin_commands
+
+    discover_plugins()
+    bridge_plugin_commands()
+
     # Override auto_yes if -y flag is passed
     if yes:
         cfg["auto_yes"] = True

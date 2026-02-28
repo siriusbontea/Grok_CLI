@@ -14,6 +14,7 @@ from rich.console import Console
 from rich.markdown import Markdown
 
 from grok_cli import config, sandbox, session
+from grok_cli.session import compute_files_hash
 from grok_cli.models import resolve_model_name
 from grok_cli.providers.grok import GrokProvider
 from grok_cli.tools import TOOL_DEFINITIONS, execute_tool
@@ -83,15 +84,29 @@ class Agent:
         self.last_elapsed: float = 0.0  # Last response time
         self.task_tracker: TaskTracker = TaskTracker()  # Live task display
 
+        self._exchange_count: int = 0  # Track exchanges for periodic snapshots
+
+        # File hash tracking for workspace change detection
+        self._files_hash: str = ""
+        self._files_changed: bool = False
+        try:
+            self._files_hash = compute_files_hash(sandbox.get_launch_dir())
+        except Exception:
+            pass  # Graceful fallback if hashing fails
+
         # Initialize provider
         api_key = config.get_api_key()
         if api_key:
             self.provider = GrokProvider(api_key)
 
     def _get_system_prompt(self) -> str:
-        """Get the system prompt with current directory."""
+        """Get the system prompt with current directory and workspace status."""
         cwd = sandbox.get_current_dir()
-        return SYSTEM_PROMPT.format(cwd=cwd)
+        prompt = SYSTEM_PROMPT.format(cwd=cwd)
+        if self._files_changed:
+            prompt += "\n\nNote: Workspace files have changed since the last exchange. Re-read files if you need current contents."
+            self._files_changed = False
+        return prompt
 
     def _ensure_provider(self) -> GrokProvider:
         """Ensure provider is initialized.
@@ -145,13 +160,38 @@ class Agent:
         """Get path to context file."""
         return config.get_project_dir() / CONTEXT_FILE
 
+    def _build_session_data(self) -> dict[str, str | list[str] | None]:
+        """Build session data dict in the format compress_session() expects.
+
+        Returns:
+            Dictionary with cwd, files_hash, and all conversation turns keyed as turn_NNN_role.
+        """
+        data: dict[str, str | list[str] | None] = {
+            "cwd": str(sandbox.get_current_dir()),
+            "files_hash": self._files_hash,
+        }
+        for i, msg in enumerate(self.messages):
+            role = msg.get("role", "unknown")
+            content = msg.get("content", "")
+            data[f"turn_{i:03d}_{role}"] = content
+        return data
+
     def save_context(self) -> None:
-        """Save current conversation to context.toon."""
+        """Save current conversation to context.toon with compression."""
         if not self.messages:
             return
 
         context_path = self._get_context_path()
-        toon_content = session.messages_to_toon(self.messages)
+        compress_mode = self.cfg.get("auto_compress", "smart")
+
+        try:
+            data = self._build_session_data()
+            compressed = session.compress_session(data, compress_mode)
+            toon_content = session.serialize_toon(compressed)
+        except RuntimeError:
+            # Context too large even after compression — fall back to uncompressed
+            toon_content = session.messages_to_toon(self.messages)
+
         context_path.write_text(toon_content)
 
     def load_context(self) -> bool:
@@ -314,6 +354,15 @@ class Agent:
                     if result["success"]:
                         tool_result = result["result"]
                         self.task_tracker.complete_task(task_id)
+                        # Recompute file hash after writes to detect workspace changes
+                        if tool_name in ("write_file", "edit_file"):
+                            try:
+                                new_hash = compute_files_hash(sandbox.get_launch_dir())
+                                if new_hash != self._files_hash:
+                                    self._files_hash = new_hash
+                                    self._files_changed = True
+                            except Exception:
+                                pass
                     else:
                         tool_result = f"Error: {result['error']}"
                         self.task_tracker.fail_task(task_id, result["error"])
@@ -350,6 +399,15 @@ class Agent:
 
             # Auto-save context after each exchange
             self.save_context()
+
+            # Periodic versioned snapshot every 5 exchanges
+            self._exchange_count += 1
+            if self._exchange_count % 5 == 0:
+                try:
+                    data = self._build_session_data()
+                    session.save_session(data, self.cfg.get("auto_compress", "smart"))
+                except Exception:
+                    pass  # Best-effort snapshot
 
             # Show stats unless in compact mode
             if not self.compact_mode:
