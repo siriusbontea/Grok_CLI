@@ -167,26 +167,6 @@ def _prune_cache_if_needed() -> None:
             pass
 
 
-def clear_cache() -> int:
-    """Clear all cached responses.
-
-    Returns:
-        Number of files deleted
-    """
-    cache_dir = _get_cache_dir()
-    cache_files = list(cache_dir.glob("*.json"))
-
-    deleted = 0
-    for cache_file in cache_files:
-        try:
-            cache_file.unlink()
-            deleted += 1
-        except Exception:
-            pass
-
-    return deleted
-
-
 def get_cache_stats() -> dict[str, Any]:
     """Get cache statistics.
 

@@ -115,14 +115,14 @@ def test_load_config_env_override(mock_home: Path):
         assert cfg["lean_mode"] is True
 
 
-def test_save_config(mock_home: Path):
-    """Test saving configuration."""
+def test_update_config_value(mock_home: Path):
+    """Test updating a single config value."""
     # First create default
     config.load_config()
 
-    # Modify and save
-    new_config = {"default_model": "grok4_fast", "lean_mode": True}
-    config.save_config(new_config)
+    # Update individual keys
+    config.update_config_value("default_model", "grok4_fast")
+    config.update_config_value("lean_mode", True)
 
     # Reload and verify
     cfg = config.load_config()

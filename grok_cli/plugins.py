@@ -17,7 +17,6 @@ from grok_cli import config
 registry = SimpleNamespace(
     commands={},  # name → (callback, help)
     create_types={},  # type_name → (extension, description)
-    model_providers=[],  # list of provider classes
 )
 
 # Track already-loaded plugin stems to avoid re-running register()
@@ -44,15 +43,6 @@ def register_create_type(type_name: str, extension: str, description: str) -> No
         description: Description of the file type
     """
     registry.create_types[type_name] = (extension, description)
-
-
-def register_model_provider(provider_class: type) -> None:
-    """Register a new model provider.
-
-    Args:
-        provider_class: Provider class (must implement Provider interface)
-    """
-    registry.model_providers.append(provider_class)
 
 
 def _load_plugins_from_dir(plugins_dir: Path, loaded_plugins: list[str]) -> None:
@@ -142,10 +132,3 @@ def get_registered_create_types() -> dict[str, tuple[str, str]]:
     return dict(registry.create_types)
 
 
-def get_registered_providers() -> list[type]:
-    """Get all registered model providers from plugins.
-
-    Returns:
-        List of provider classes
-    """
-    return list(registry.model_providers)

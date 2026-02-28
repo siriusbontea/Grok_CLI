@@ -142,33 +142,6 @@ def execute_slash_command(command: str, args: list[str], cfg: dict[str, Any], ag
     return True
 
 
-def get_slash_command_completions(prefix: str) -> list[str]:
-    """Get completions for slash commands.
-
-    Args:
-        prefix: Current input prefix (including /)
-
-    Returns:
-        List of matching command names
-    """
-    if not prefix.startswith("/"):
-        return []
-
-    search = prefix[1:].lower()
-    completions = []
-
-    for cmd in SLASH_COMMANDS:
-        if cmd.startswith(search):
-            completions.append(f"/{cmd}")
-
-    # Add exit/quit
-    for cmd in ("exit", "quit", "q"):
-        if cmd.startswith(search):
-            completions.append(f"/{cmd}")
-
-    return completions
-
-
 # --- Command Handlers ---
 
 

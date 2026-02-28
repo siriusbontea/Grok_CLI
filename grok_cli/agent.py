@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Any
 
 from rich.console import Console
-from rich.markdown import Markdown
 
 from grok_cli import config, sandbox, session
 from grok_cli.budget import record_and_warn
@@ -503,16 +502,3 @@ class Agent:
         return full_response
 
 
-def display_response(response: str) -> None:
-    """Display a response with markdown formatting.
-
-    Note: This is used for non-streaming fallback only.
-    Streaming responses are displayed directly.
-
-    Args:
-        response: Response text to display
-    """
-    if response:
-        console.print()
-        console.print(Markdown(response))
-        console.print()

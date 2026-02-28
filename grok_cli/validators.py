@@ -402,10 +402,3 @@ def validate_file(content: str, filename: str) -> ValidationResult | None:
     return None
 
 
-def get_supported_extensions() -> list[str]:
-    """Get list of file extensions that have validators.
-
-    Returns:
-        List of extensions (e.g., ['.py', '.json', ...])
-    """
-    return list(VALIDATORS.keys())

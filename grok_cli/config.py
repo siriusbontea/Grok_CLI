@@ -182,35 +182,11 @@ def load_config() -> dict[str, Any]:
     return result
 
 
-def save_config(config: dict[str, Any]) -> None:
-    """Save configuration to ~/.grok/config.toml.
-
-    Args:
-        config: Configuration dictionary to save
-    """
-    config_path = get_config_path()
-
-    # Load existing to preserve comments if possible
-    if config_path.exists():
-        doc = tomlkit.parse(config_path.read_text())
-        # Update values
-        for key, value in config.items():
-            doc[key] = value
-    else:
-        # Create new document
-        doc = tomlkit.document()
-        for key, value in config.items():
-            doc[key] = value
-
-    config_path.write_text(tomlkit.dumps(doc))
-
-
 def update_config_value(key: str, value: Any) -> None:
     """Update a single key in config.toml without overwriting other values.
 
-    Unlike save_config(cfg), this only touches the specified key,
-    preventing runtime-only overrides (like -y flag) from leaking
-    into the persisted config.
+    Only touches the specified key, preventing runtime-only overrides
+    (like -y flag) from leaking into the persisted config.
 
     Args:
         key: Configuration key to update

@@ -106,19 +106,6 @@ def test_get_cached_response_expired(mock_cache_dir: Path):
     assert not cache_file.exists()
 
 
-def test_clear_cache(mock_cache_dir: Path):
-    """Test clearing all cached responses."""
-    # Create some cache files
-    for i in range(5):
-        cache_file = mock_cache_dir / f"test{i}.json"
-        cache_file.write_text("{}")
-
-    deleted = cache.clear_cache()
-
-    assert deleted == 5
-    assert len(list(mock_cache_dir.glob("*.json"))) == 0
-
-
 def test_get_cache_stats_empty(mock_cache_dir: Path):
     """Test getting stats for empty cache."""
     stats = cache.get_cache_stats()
