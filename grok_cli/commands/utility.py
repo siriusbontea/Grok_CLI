@@ -219,6 +219,7 @@ For detailed documentation, see README.md or visit the blueprint.
                 "  auto_yes        = false            # Auto-confirm file operations (or use -y flag)\n"
                 "  colour          = true             # Enable colored output\n"
                 "  lean_mode       = false            # Minimal comments in generated code\n"
+                "  compact_mode    = false            # Hide stats after each response\n"
                 "  budget_monthly  = 0.0              # Monthly budget limit in USD (0 = disabled)\n"
                 "  web_daily_quota = 100000           # Daily token quota for web plugin (0 = disabled)\n\n"
                 "Environment variables:\n"

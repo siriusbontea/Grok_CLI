@@ -167,6 +167,15 @@ def start_repl(cfg: dict[str, Any]) -> None:
     Args:
         cfg: Configuration dictionary
     """
+    # Restore saved color theme (if user set one via /theme)
+    theme_name = cfg.get("theme", "default")
+    if theme_name != "default":
+        from grok_cli.slash_commands import COLOR_THEMES
+        from grok_cli.ui import prompt as prompt_mod
+
+        if theme_name in COLOR_THEMES:
+            prompt_mod.PROMPT_STYLE.update(COLOR_THEMES[theme_name])
+
     # Set up project-local history file
     history_file = config.get_project_dir() / "history"
     history = FileHistory(str(history_file))
@@ -228,7 +237,8 @@ def start_repl(cfg: dict[str, Any]) -> None:
                 continue
 
             # Handle shell commands
-            first_word = line.split()[0] if line.split() else ""
+            words = line.split()
+            first_word = words[0] if words else ""
             if is_shell_command(first_word):
                 try:
                     execute_shell_command(line.split())

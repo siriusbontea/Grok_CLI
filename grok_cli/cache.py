@@ -73,7 +73,11 @@ def get_cached_response(messages: list[dict[str, str]], model: str, temperature:
         cached_data = json.loads(cache_file.read_text())
 
         # Check if cache is still valid (not older than 30 days)
-        cached_time = datetime.fromisoformat(cached_data.get("cached_at", ""))
+        cached_at_str = cached_data.get("cached_at", "")
+        if not cached_at_str:
+            cache_file.unlink()
+            return None
+        cached_time = datetime.fromisoformat(cached_at_str)
         if datetime.now() - cached_time > timedelta(days=30):
             # Cache expired, delete it
             cache_file.unlink()

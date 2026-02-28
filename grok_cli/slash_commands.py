@@ -206,6 +206,7 @@ def cmd_help(args: list[str], cfg: dict[str, Any], agent: Any) -> None:
                 "  auto_yes        - Skip file operation prompts (or use -y flag)\n"
                 "  colour          - Colored output\n"
                 "  lean_mode       - Minimal comments in generated code\n"
+                "  compact_mode    - Hide stats after each response\n"
                 "  budget_monthly  - Monthly budget limit in USD (0 = disabled)\n"
                 "  web_daily_quota - Web plugin token quota (0 = disabled)\n\n"
                 "Environment overrides:\n"

@@ -80,9 +80,14 @@ def truncate_cwd(cwd: Path, max_length: int = 40) -> str:
         return path_str[: max_length - 3] + "..."
 
     # Keep first and last, truncate middle
-    while len(path_str) > max_length and len(parts) > 2:
+    while len(path_str) > max_length and len(parts) > 3:
+        # Remove the second-to-last real component (just before final)
         parts = parts[:1] + ("...",) + parts[-1:]
         path_str = str(Path(*parts))
+
+    # If still too long after collapsing, hard-truncate
+    if len(path_str) > max_length:
+        path_str = path_str[:max_length - 3] + "..."
 
     return path_str
 
