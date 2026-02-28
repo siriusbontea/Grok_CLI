@@ -277,15 +277,21 @@ class Agent:
             iteration += 1
 
             # First, make a non-streaming call to check for tool use
-            with console.status("[bold green]Thinking...", spinner="dots"):
-                response = provider.client.chat.completions.create(  # type: ignore[call-overload]
-                    model=model,
-                    messages=messages,
-                    tools=TOOL_DEFINITIONS,
-                    tool_choice="auto",
-                    temperature=0.7,
-                    max_tokens=8192,
-                )
+            try:
+                with console.status("[bold green]Thinking...", spinner="dots"):
+                    response = provider.client.chat.completions.create(  # type: ignore[call-overload]
+                        model=model,
+                        messages=messages,
+                        tools=TOOL_DEFINITIONS,
+                        tool_choice="auto",
+                        temperature=0.7,
+                        max_tokens=8192,
+                    )
+            except Exception:
+                # Remove orphaned user message so history stays paired
+                if self.messages and self.messages[-1].get("role") == "user":
+                    self.messages.pop()
+                raise
 
             # Track budget for non-streaming call
             if hasattr(response, "usage") and response.usage:
@@ -439,8 +445,11 @@ class Agent:
 
             return final_content
 
-        # If we hit max iterations, return what we have
-        return "I encountered too many steps. Please try a simpler request."
+        # If we hit max iterations, record as assistant turn so history stays paired
+        error_msg = "I encountered too many steps. Please try a simpler request."
+        self.messages.append({"role": "assistant", "content": error_msg})
+        self.save_context()
+        return error_msg
 
     def _stream_response(self, provider: GrokProvider, model: str, messages: list[dict[str, Any]]) -> str:
         """Stream response from the model.

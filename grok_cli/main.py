@@ -54,6 +54,9 @@ def main(
         else:
             console.print("[green]Sandbox remains active.[/green]\n")
 
+    # Check first-run BEFORE load_config (which creates the config file)
+    first_run = config.is_first_run()
+
     # Load configuration (creates default on first run)
     cfg = config.load_config()
 
@@ -80,8 +83,8 @@ def main(
     if ctx.invoked_subcommand is None:
         from grok_cli.ui.banner import show_banner, show_welcome_banner
 
-        # Check for first run
-        if config.is_first_run():
+        # Check for first run (computed before load_config created the file)
+        if first_run:
             # First run: show full welcome with instructions
             show_welcome_banner()
         else:

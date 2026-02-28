@@ -7,6 +7,7 @@ model interaction (e.g., /help, /model, /cost).
 import subprocess
 import sys
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Callable
 
 from rich.console import Console
@@ -538,12 +539,19 @@ def cmd_save(args: list[str], cfg: dict[str, Any], agent: Any) -> None:
     # Generate filename with timestamp
     timestamp = datetime.now().strftime("%Y-%m-%dT%H-%M-%S")
     name = args[0] if args else timestamp
+    # Sanitize: strip path separators to prevent traversal (e.g. "../../evil")
+    name = Path(name).name
     filename = f"{name}.toon"
 
     # Get project-local sessions directory
     sessions_dir = config.get_project_dir() / "sessions"
     sessions_dir.mkdir(parents=True, exist_ok=True)
     filepath = sessions_dir / filename
+
+    # Verify resolved path stays within sessions_dir
+    if not filepath.resolve().is_relative_to(sessions_dir.resolve()):
+        console.print("[red]Error:[/red] Invalid session name")
+        return
 
     # Convert messages to TOON format
     toon_content = session.messages_to_toon(agent.messages)
@@ -585,9 +593,16 @@ def cmd_resume(args: list[str], cfg: dict[str, Any], agent: Any) -> None:
                 console.print(f"[red]Invalid session number:[/red] {name}")
                 return
         else:
+            # Sanitize: strip path separators to prevent traversal
+            name = Path(name).name
             if not name.endswith(".toon"):
                 name += ".toon"
             filepath = sessions_dir / name
+
+            # Verify resolved path stays within sessions_dir
+            if not filepath.resolve().is_relative_to(sessions_dir.resolve()):
+                console.print("[red]Error:[/red] Invalid session name")
+                return
 
             if not filepath.exists():
                 console.print(f"[red]Session not found:[/red] {name}")

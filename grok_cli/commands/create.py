@@ -215,7 +215,7 @@ def create_command(
         for warn in validation.warnings:
             console.print(f"  [yellow]•[/yellow] {warn}")
 
-    if validation and validation.has_errors and not auto_yes:
+    if validation and validation.has_errors and not auto_yes_setting:
         from rich.prompt import Confirm
 
         if not Confirm.ask("Save despite validation errors?", default=False):

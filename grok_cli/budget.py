@@ -6,6 +6,7 @@ Usage data is persisted to ~/.grok/usage.json.
 """
 
 import json
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -31,6 +32,7 @@ class BudgetTracker:
             usage_path: Path to usage.json file. Defaults to ~/.grok/usage.json.
         """
         self._path = usage_path or (get_grok_dir() / "usage.json")
+        self._lock = threading.Lock()
         self._data: dict[str, Any] = self._load()
 
     def _current_month(self) -> str:
@@ -71,6 +73,8 @@ class BudgetTracker:
     def record_usage(self, model: str, prompt_tokens: int, completion_tokens: int) -> None:
         """Record token usage and calculate cost.
 
+        Thread-safe: uses a lock so parallel heavy-mode agents don't race.
+
         Args:
             model: API model string
             prompt_tokens: Number of input tokens
@@ -79,12 +83,12 @@ class BudgetTracker:
         input_price, output_price = get_model_pricing(model)
         cost = (prompt_tokens / 1_000_000) * input_price + (completion_tokens / 1_000_000) * output_price
 
-        self._data["total_cost_usd"] += cost
-        self._data["total_prompt_tokens"] += prompt_tokens
-        self._data["total_completion_tokens"] += completion_tokens
-        self._data["calls"] += 1
-
-        self._save()
+        with self._lock:
+            self._data["total_cost_usd"] += cost
+            self._data["total_prompt_tokens"] += prompt_tokens
+            self._data["total_completion_tokens"] += completion_tokens
+            self._data["calls"] += 1
+            self._save()
 
     def check_budget(self, budget_monthly: float) -> str | None:
         """Check if budget threshold has been reached.
