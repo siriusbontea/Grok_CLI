@@ -467,22 +467,24 @@ def cmd_copy(args: list[str], cfg: dict[str, Any], agent: Any) -> None:
     try:
         if sys.platform == "darwin":
             # macOS
-            process = subprocess.Popen(["pbcopy"], stdin=subprocess.PIPE)
-            process.communicate(response.encode("utf-8"))
+            subprocess.run(["pbcopy"], input=response.encode("utf-8"), timeout=5, check=True)
         elif sys.platform == "win32":
             # Windows
-            process = subprocess.Popen(["clip"], stdin=subprocess.PIPE)
-            process.communicate(response.encode("utf-8"))
+            subprocess.run(["clip"], input=response.encode("utf-8"), timeout=5, check=True)
         else:
             # Linux (requires xclip or xsel)
             try:
-                process = subprocess.Popen(["xclip", "-selection", "clipboard"], stdin=subprocess.PIPE)
-                process.communicate(response.encode("utf-8"))
+                subprocess.run(
+                    ["xclip", "-selection", "clipboard"], input=response.encode("utf-8"), timeout=5, check=True
+                )
             except FileNotFoundError:
-                process = subprocess.Popen(["xsel", "--clipboard", "--input"], stdin=subprocess.PIPE)
-                process.communicate(response.encode("utf-8"))
+                subprocess.run(
+                    ["xsel", "--clipboard", "--input"], input=response.encode("utf-8"), timeout=5, check=True
+                )
 
         console.print(f"[green]✓[/green] Copied {len(response)} characters to clipboard")
+    except subprocess.TimeoutExpired:
+        console.print("[red]Error:[/red] Clipboard operation timed out")
     except Exception as e:
         console.print(f"[red]Error:[/red] Could not copy to clipboard: {e}")
         console.print("[dim]On Linux, install xclip or xsel[/dim]")

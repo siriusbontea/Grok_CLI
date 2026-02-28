@@ -215,8 +215,8 @@ class Agent:
         try:
             toon_content = context_path.read_text(encoding="utf-8")
             self.messages = session.toon_to_messages(toon_content)
-            # Estimate tokens from loaded messages
-            self.total_tokens = sum(len(m.get("content", "")) // 4 for m in self.messages)
+            # Estimate tokens from loaded messages (guard against None content)
+            self.total_tokens = sum(len(m.get("content") or "") // 4 for m in self.messages)
             return len(self.messages) > 0
         except Exception as e:
             console.print(f"[yellow]Warning: Could not load saved context ({e}). Starting fresh.[/yellow]")
@@ -232,7 +232,7 @@ class Agent:
 
     def _estimate_tokens(self) -> int:
         """Estimate current context size in tokens (rough: 4 chars = 1 token)."""
-        total_chars = sum(len(str(m.get("content", ""))) for m in self.messages)
+        total_chars = sum(len(m.get("content") or "") for m in self.messages)
         return total_chars // 4
 
     def _check_context_warning(self) -> None:
@@ -452,7 +452,11 @@ class Agent:
             return final_content
 
         # If we hit max iterations, record as assistant turn so history stays paired
-        error_msg = "I encountered too many steps. Please try a simpler request."
+        if tools_used_this_exchange:
+            tool_prefix = "[Tools: " + ", ".join(tools_used_this_exchange) + "]\n\n"
+        else:
+            tool_prefix = ""
+        error_msg = tool_prefix + "I encountered too many steps. Please try a simpler request."
         self.messages.append({"role": "assistant", "content": error_msg})
         self.save_context()
         return error_msg

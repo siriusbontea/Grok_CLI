@@ -86,6 +86,14 @@ class GrokProvider(Provider):
                     max_tokens=max_tokens,
                 )
 
+                # Guard against empty choices (API edge case)
+                if not response.choices:
+                    raise APIError(
+                        message="API returned no choices",
+                        request=None,  # type: ignore[arg-type]
+                        body=None,
+                    )
+
                 # Extract response data
                 return {
                     "content": response.choices[0].message.content or "",

@@ -396,7 +396,7 @@ def _build_tree(path: Path, tree: Tree, current_depth: int = 0, max_depth: int =
                 if item.is_symlink():
                     try:
                         sandbox.check_path_allowed(item.resolve(), "read")
-                    except PermissionError:
+                    except (PermissionError, OSError):
                         tree.add(f"[cyan]{item.name}@[/cyan] [dim](outside sandbox)[/dim]")
                         continue
                 branch = tree.add(f"[blue]{item.name}/[/blue]")
