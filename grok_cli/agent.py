@@ -103,6 +103,11 @@ class Agent:
         """Get the system prompt with current directory and workspace status."""
         cwd = sandbox.get_current_dir()
         prompt = SYSTEM_PROMPT.format(cwd=cwd)
+        if self.cfg.get("lean_mode", False):
+            prompt += (
+                "\n\nLean Mode is ACTIVE: When generating or editing code, use minimal comments. "
+                "Only include comments for non-obvious logic. Do not add docstrings unless explicitly requested."
+            )
         if self._files_changed:
             prompt += "\n\nNote: Workspace files have changed since the last exchange. Re-read files if you need current contents."
             self._files_changed = False

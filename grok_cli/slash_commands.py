@@ -198,6 +198,20 @@ def cmd_help(args: list[str], cfg: dict[str, Any], agent: Any) -> None:
                 "  /n or /no   - Disable auto-confirm (require prompts)\n\n"
                 "Or set auto_yes = true in ~/.grok/config.toml"
             ),
+            "config": (
+                "[bold]Configuration[/bold]\n\n"
+                "Config file: ~/.grok/config.toml\n\n"
+                "  default_model   - Model to use (grok41_fast, grok41_heavy, etc.)\n"
+                "  auto_compress   - Session compression (always | smart | never)\n"
+                "  auto_yes        - Skip file operation prompts (or use -y flag)\n"
+                "  colour          - Colored output\n"
+                "  lean_mode       - Minimal comments in generated code\n"
+                "  budget_monthly  - Monthly budget limit in USD (0 = disabled)\n"
+                "  web_daily_quota - Web plugin token quota (0 = disabled)\n\n"
+                "Environment overrides:\n"
+                "  XAI_API_KEY   - API key (required)\n"
+                "  GROK_LEAN=1   - Force lean_mode on"
+            ),
         }
 
         if topic in topics:
@@ -220,7 +234,11 @@ def cmd_help(args: list[str], cfg: dict[str, Any], agent: Any) -> None:
     • Add type hints to utils.py
 
 [bold]Slash Commands:[/bold]
-  /help [topic]     Show this help (topics: tools, slash, confirm)
+  /help [topic]     Show this help (topics: tools, slash, confirm, config)
+  /create <t> <d>   Create a new file with AI (/create py fibonacci)
+  /edit <f> <instr>  Edit a file with AI (/edit utils.py add type hints)
+  /ask <question>   Ask a question without file context
+  /heavy <task>     Run parallel agents + meta-resolver
   /model <name>     Switch to a different model
   /models           List available models
   /cost             Show token usage dashboard
@@ -652,6 +670,60 @@ def cmd_heavy(args: list[str], cfg: dict[str, Any], agent: Any) -> None:
         console.print(f"[red]Error running heavy mode:[/red] {e}")
 
 
+def cmd_create(args: list[str], cfg: dict[str, Any], agent: Any) -> None:
+    """Create a new file with AI-generated content."""
+    if len(args) < 2:
+        console.print("[yellow]Usage:[/yellow] /create <type> <description>")
+        console.print("[dim]Example: /create py binary search algorithm[/dim]")
+        return
+
+    from grok_cli.commands.create import create_command
+
+    file_type = args[0]
+    description = " ".join(args[1:])
+
+    try:
+        create_command(file_type, description, None, cfg, cfg.get("auto_yes", False))
+    except (ValueError, PermissionError, FileExistsError) as e:
+        console.print(f"[red]Error:[/red] {e}")
+
+
+def cmd_edit(args: list[str], cfg: dict[str, Any], agent: Any) -> None:
+    """Edit an existing file with AI assistance."""
+    if len(args) < 2:
+        console.print("[yellow]Usage:[/yellow] /edit <filename> <instruction>")
+        console.print("[dim]Example: /edit utils.py add type hints[/dim]")
+        return
+
+    from grok_cli.commands.edit import edit_command
+
+    filename = args[0]
+    instruction = " ".join(args[1:])
+
+    try:
+        edit_command(filename, instruction, cfg, cfg.get("auto_yes", False))
+    except (ValueError, FileNotFoundError, PermissionError, RuntimeError) as e:
+        console.print(f"[red]Error:[/red] {e}")
+
+
+def cmd_ask(args: list[str], cfg: dict[str, Any], agent: Any) -> None:
+    """Ask a general question without file context."""
+    if not args:
+        console.print("[yellow]Usage:[/yellow] /ask <question>")
+        console.print("[dim]Example: /ask explain async/await in Python[/dim]")
+        return
+
+    from grok_cli.commands.ask import ask_command, display_answer
+
+    question = " ".join(args)
+
+    try:
+        answer = ask_command(question, cfg)
+        display_answer(answer)
+    except ValueError as e:
+        console.print(f"[red]Error:[/red] {e}")
+
+
 # --- Register Commands ---
 
 register_slash_command("help", cmd_help, "Show help information", "/help [topic]")
@@ -674,6 +746,9 @@ register_slash_command("save", cmd_save, "Save conversation", "/save [name]")
 register_slash_command("resume", cmd_resume, "Resume saved conversation", "/resume [name]")
 register_slash_command("theme", cmd_theme, "Set color theme", "/theme [name]")
 register_slash_command("heavy", cmd_heavy, "Run parallel agents + meta-resolver", "/heavy <task>")
+register_slash_command("create", cmd_create, "Create a new file", "/create <type> <description>")
+register_slash_command("edit", cmd_edit, "Edit a file with AI", "/edit <file> <instruction>")
+register_slash_command("ask", cmd_ask, "Ask a question", "/ask <question>")
 
 
 def bridge_plugin_commands() -> None:

@@ -192,6 +192,20 @@ For detailed documentation, see README.md or visit the blueprint.
             "heavy": "Complex tasks with parallel agents: grok heavy <task>\nUses 3 agents + meta-resolver for best quality.",
             "models": "List models: grok models\nSwitch model: grok model <name>",
             "sandbox": "All file operations are sandboxed to launch directory.\nUse --dangerously-allow-entire-fs to disable (type YES to confirm).",
+            "config": (
+                "Configuration: ~/.grok/config.toml\n\n"
+                "Settings:\n"
+                '  default_model   = "grok41_fast"    # Default model\n'
+                '  auto_compress   = "smart"          # Session compression: always | smart | never\n'
+                "  auto_yes        = false            # Auto-confirm file operations (or use -y flag)\n"
+                "  colour          = true             # Enable colored output\n"
+                "  lean_mode       = false            # Minimal comments in generated code\n"
+                "  budget_monthly  = 0.0              # Monthly budget limit in USD (0 = disabled)\n"
+                "  web_daily_quota = 100000           # Daily token quota for web plugin (0 = disabled)\n\n"
+                "Environment variables:\n"
+                "  XAI_API_KEY   - Grok API key (required)\n"
+                "  GROK_LEAN=1   - Override lean_mode to true"
+            ),
         }
 
         if topic in topics:
