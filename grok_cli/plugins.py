@@ -6,6 +6,7 @@ Each plugin must implement a register() function that calls registration functio
 
 import importlib.util
 import sys
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Callable
 
@@ -51,28 +52,25 @@ def register_model_provider(provider_class: type) -> None:
     registry.model_providers.append(provider_class)
 
 
-def discover_plugins() -> list[str]:
-    """Discover and load all plugins from ~/.grok/plugins/
+def _load_plugins_from_dir(plugins_dir: Path, loaded_plugins: list[str]) -> None:
+    """Load plugins from a directory, skipping already-loaded names.
 
-    Returns:
-        List of loaded plugin names
-
-    Raises:
-        Exception: If plugin loading fails
+    Args:
+        plugins_dir: Directory to scan for .py plugin files
+        loaded_plugins: List of already-loaded plugin stems (mutated in place)
     """
-    plugins_dir = config.get_grok_dir() / "plugins"
-    plugins_dir.mkdir(exist_ok=True)
+    if not plugins_dir.is_dir():
+        return
 
-    loaded_plugins = []
-
-    # Find all .py files in plugins directory
     for plugin_file in plugins_dir.glob("*.py"):
-        # Skip __init__.py and files starting with _
         if plugin_file.name.startswith("_"):
             continue
 
+        # Skip if a plugin with this stem was already loaded (user overrides official)
+        if plugin_file.stem in loaded_plugins:
+            continue
+
         try:
-            # Load module from file
             module_name = f"grok_plugin_{plugin_file.stem}"
             spec = importlib.util.spec_from_file_location(module_name, plugin_file)
 
@@ -83,17 +81,36 @@ def discover_plugins() -> list[str]:
             sys.modules[module_name] = module
             spec.loader.exec_module(module)
 
-            # Call register() if it exists
             if hasattr(module, "register"):
                 module.register()
                 loaded_plugins.append(plugin_file.stem)
 
         except Exception as e:
-            # Log error but don't crash - plugin loading is optional
             from rich.console import Console
 
             console = Console()
             console.print(f"[yellow]Warning:[/yellow] Failed to load plugin {plugin_file.name}: {e}")
+
+
+def discover_plugins() -> list[str]:
+    """Discover and load plugins from user dir (~/.grok/plugins/) then official dir.
+
+    User plugins are loaded first and take precedence — if a user has a plugin
+    with the same stem as an official one, the official version is skipped.
+
+    Returns:
+        List of loaded plugin names
+    """
+    loaded_plugins: list[str] = []
+
+    # 1. User plugins (highest priority)
+    user_plugins_dir = config.get_grok_dir() / "plugins"
+    user_plugins_dir.mkdir(exist_ok=True)
+    _load_plugins_from_dir(user_plugins_dir, loaded_plugins)
+
+    # 2. Official bundled plugins (shipped with the package)
+    official_plugins_dir = Path(__file__).parent / "official_plugins"
+    _load_plugins_from_dir(official_plugins_dir, loaded_plugins)
 
     return loaded_plugins
 
