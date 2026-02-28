@@ -136,19 +136,16 @@ def _prune_cache_if_needed() -> None:
     if not cache_files:
         return
 
-    # Calculate total size
-    total_size = sum(f.stat().st_size for f in cache_files)
     max_size = 500 * 1024 * 1024  # 500 MB
 
-    # Sort by modification time (oldest first)
-    cache_files.sort(key=lambda f: f.stat().st_mtime)
-
-    # Gather stats once to avoid repeated stat() calls and O(n²) list.remove()
+    # Single stat() pass to gather size and mtime for all files
     file_entries: list[tuple[Path, float, int]] = []
+    total_size = 0
     for cache_file in cache_files:
         try:
             st = cache_file.stat()
             file_entries.append((cache_file, st.st_mtime, st.st_size))
+            total_size += st.st_size
         except OSError:
             pass  # File disappeared between glob and stat
 

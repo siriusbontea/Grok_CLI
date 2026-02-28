@@ -429,7 +429,7 @@ class Agent:
             record_and_warn(model, estimated_prompt, estimated_completion, self.cfg.get("budget_monthly", 0.0))
 
             # Update token count (estimate since streaming doesn't give usage)
-            self.total_tokens += len(final_content) // 4 + len(user_message) // 4
+            self.total_tokens += (len(final_content) + len(user_message)) // 4
 
             # Auto-save context after each exchange
             self.save_context()

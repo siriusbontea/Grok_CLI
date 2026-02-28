@@ -140,6 +140,3 @@ class GrokProvider(Provider):
                 # Don't retry client errors (4xx)
                 raise
 
-        # Should never reach here, but just in case
-        raise RuntimeError("Unknown error occurred in API call")
-

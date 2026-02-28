@@ -87,3 +87,18 @@ def test_none_values_skipped():
     result = serialize_toon(data)
     assert "unused" not in result
     assert "goal" in result
+
+
+def test_turn_keys_with_commas_not_split():
+    """Test that turn_* keys containing commas are NOT split into lists.
+
+    Only keys in _LIST_KEYS (history, decisions) get list treatment.
+    Content keys like turn_000_assistant can contain arbitrary text with commas.
+    """
+    code_content = "def foo(a, b, c):\n    return a + b + c"
+    data = {"turn_000_assistant": code_content}
+    serialized = serialize_toon(data)
+    parsed = parse_toon(serialized)
+    # Must remain a string, not a list
+    assert isinstance(parsed["turn_000_assistant"], str)
+    assert parsed["turn_000_assistant"] == code_content

@@ -58,6 +58,12 @@ def test_is_reasoning_model_false():
     assert models.is_reasoning_model("grok_code") is False
 
 
+def test_is_reasoning_model_unknown():
+    """Test that is_reasoning_model returns False for unknown models (not raise)."""
+    assert models.is_reasoning_model("nonexistent_model") is False
+    assert models.is_reasoning_model("totally-made-up") is False
+
+
 def test_list_models():
     """Test listing all available models."""
     model_list = models.list_models()

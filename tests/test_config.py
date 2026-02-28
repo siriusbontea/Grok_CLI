@@ -153,5 +153,7 @@ def test_default_config_values():
     assert "auto_yes" in config.DEFAULT_CONFIG
     assert "colour" in config.DEFAULT_CONFIG
     assert "lean_mode" in config.DEFAULT_CONFIG
+    assert "compact_mode" in config.DEFAULT_CONFIG
     assert "budget_monthly" in config.DEFAULT_CONFIG
     assert "web_daily_quota" in config.DEFAULT_CONFIG
+    assert "theme" in config.DEFAULT_CONFIG
