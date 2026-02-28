@@ -109,8 +109,9 @@ def _run_parallel_agents(
         # Collect results
         for agent_name, future in futures.items():
             response = future.result()
-            responses[agent_name] = response["content"]
-            console.print(f"[green]✓[/green] Agent {agent_name.upper()}: {len(response['content'])} chars")
+            content = response.get("content", "")
+            responses[agent_name] = content
+            console.print(f"[green]✓[/green] Agent {agent_name.upper()}: {len(content)} chars")
 
             # Track budget for each parallel agent
             usage = response.get("usage", {})
@@ -160,7 +161,8 @@ def _run_meta_resolver(
         max_tokens=8192,
     )
 
-    console.print(f"[green]✓[/green] Meta-resolver: {len(response['content'])} chars")
+    content = response.get("content", "")
+    console.print(f"[green]✓[/green] Meta-resolver: {len(content)} chars")
 
     # Track budget for meta-resolver
     usage = response.get("usage", {})
@@ -176,7 +178,7 @@ def _run_meta_resolver(
     console.print(f"\n[dim]Meta-resolver tokens: {usage.get('total_tokens', 0)}[/dim]")
     console.print("[dim]Total cost ≈ 3.5× single call[/dim]\n")
 
-    return str(response.get("content", ""))
+    return str(content)
 
 
 def display_heavy_result(result: str) -> None:

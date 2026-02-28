@@ -14,6 +14,7 @@ Supported file types:
 
 import json
 import re
+import shutil
 import subprocess
 import tempfile
 from dataclasses import dataclass
@@ -65,15 +66,7 @@ class ValidationResult:
 
 def _check_command_exists(cmd: str) -> bool:
     """Check if a command exists in PATH."""
-    try:
-        subprocess.run(
-            ["which", cmd],
-            capture_output=True,
-            check=True,
-        )
-        return True
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return False
+    return shutil.which(cmd) is not None
 
 
 # --- Validators ---

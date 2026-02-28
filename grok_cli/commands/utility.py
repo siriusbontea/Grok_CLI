@@ -47,7 +47,7 @@ def model_command(model_name: str, cfg: dict[str, Any]) -> None:
 
     # Update config
     cfg["default_model"] = model_name
-    config.save_config(cfg)
+    config.update_config_value("default_model", model_name)
 
     friendly = get_friendly_name(api_model)
     console.print(f"[green]✓[/green] Default model set to: {friendly} ({api_model})")

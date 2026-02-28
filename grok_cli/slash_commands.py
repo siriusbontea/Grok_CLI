@@ -617,6 +617,7 @@ def cmd_resume(args: list[str], cfg: dict[str, Any], agent: Any) -> None:
         toon_content = filepath.read_text()
         messages = session.toon_to_messages(toon_content)
         agent.messages = messages
+        agent.total_tokens = sum(len(m.get("content", "")) // 4 for m in messages)
         console.print(f"\n[green]✓[/green] Resumed session ({len(messages)} messages)")
         console.print(f"[dim]Loaded from: {filepath}[/dim]\n")
     except Exception as e:

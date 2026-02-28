@@ -249,16 +249,23 @@ def execute_tool(tool_name: str, arguments: dict[str, Any], auto_confirm: bool =
     """
     try:
         if tool_name == "read_file":
-            return tool_read_file(arguments["path"])
+            path = arguments.get("path")
+            if not path:
+                return {"success": False, "error": "read_file requires 'path' argument"}
+            return tool_read_file(path)
         elif tool_name == "write_file":
-            return tool_write_file(arguments["path"], arguments["content"], auto_confirm)
+            path = arguments.get("path")
+            content = arguments.get("content")
+            if not path or content is None:
+                return {"success": False, "error": "write_file requires 'path' and 'content' arguments"}
+            return tool_write_file(path, content, auto_confirm)
         elif tool_name == "edit_file":
-            return tool_edit_file(
-                arguments["path"],
-                arguments["old_text"],
-                arguments["new_text"],
-                auto_confirm,
-            )
+            path = arguments.get("path")
+            old_text = arguments.get("old_text")
+            new_text = arguments.get("new_text")
+            if not path or old_text is None or new_text is None:
+                return {"success": False, "error": "edit_file requires 'path', 'old_text', and 'new_text' arguments"}
+            return tool_edit_file(path, old_text, new_text, auto_confirm)
         elif tool_name == "list_files":
             return tool_list_files(arguments.get("path", "."))
         else:
