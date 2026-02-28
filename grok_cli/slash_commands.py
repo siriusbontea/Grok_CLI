@@ -604,6 +604,18 @@ def cmd_resume(args: list[str], cfg: dict[str, Any], agent: Any) -> None:
     try:
         toon_content = filepath.read_text()
         messages = session.toon_to_messages(toon_content)
+
+        # If no turn_ keys found (compressed session), reconstruct from history
+        if not messages:
+            parsed = session.parse_toon(toon_content)
+            history = parsed.get("history", "")
+            if history:
+                history_str = ", ".join(history) if isinstance(history, list) else str(history)
+                messages = [{"role": "user", "content": f"[Previous session context] {history_str}"}]
+            else:
+                console.print("[yellow]Session file has no recoverable messages.[/yellow]")
+                return
+
         agent.messages = messages
         agent.total_tokens = sum(len(m.get("content", "")) // 4 for m in messages)
         console.print(f"\n[green]✓[/green] Resumed session ({len(messages)} messages)")

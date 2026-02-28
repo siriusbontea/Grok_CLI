@@ -106,21 +106,25 @@ def _run_parallel_agents(
             )
             futures[agent_name] = future
 
-        # Collect results
+        # Collect results (gracefully handle per-agent failures)
         for agent_name, future in futures.items():
-            response = future.result()
-            content = response.get("content", "")
-            responses[agent_name] = content
-            console.print(f"[green]✓[/green] Agent {agent_name.upper()}: {len(content)} chars")
+            try:
+                response = future.result()
+                content = response.get("content", "")
+                responses[agent_name] = content
+                console.print(f"[green]✓[/green] Agent {agent_name.upper()}: {len(content)} chars")
 
-            # Track budget for each parallel agent
-            usage = response.get("usage", {})
-            record_and_warn(
-                REASONING_MODEL,
-                usage.get("prompt_tokens", 0),
-                usage.get("completion_tokens", 0),
-                budget_monthly,
-            )
+                # Track budget for each parallel agent
+                usage = response.get("usage", {})
+                record_and_warn(
+                    REASONING_MODEL,
+                    usage.get("prompt_tokens", 0),
+                    usage.get("completion_tokens", 0),
+                    budget_monthly,
+                )
+            except Exception as e:
+                console.print(f"[red]✗[/red] Agent {agent_name.upper()} failed: {e}")
+                responses[agent_name] = f"[Agent error: {e}]"
 
     return responses
 

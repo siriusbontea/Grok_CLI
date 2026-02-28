@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from openai import AuthenticationError
 from rich.console import Console
 
 from grok_cli import config, sandbox, session
@@ -484,7 +485,7 @@ class Agent:
 
             console.print()  # Final newline
 
-        except (ValueError, KeyError):
+        except (ValueError, KeyError, AuthenticationError):
             # Non-retriable errors — don't fall back, just re-raise
             raise
         except Exception:

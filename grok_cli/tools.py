@@ -368,7 +368,7 @@ def tool_write_file(path: str, content: str, auto_confirm: bool = False) -> dict
     # Show preview
     if file_exists:
         # Show diff for overwrites
-        old_content = abs_path.read_text()
+        old_content = abs_path.read_text(encoding="utf-8", errors="replace")
         _show_diff(old_content, content, path)
     else:
         # Show content preview for new files
@@ -447,7 +447,7 @@ def tool_write_file(path: str, content: str, auto_confirm: bool = False) -> dict
             }
 
     # Write file
-    abs_path.write_text(content)
+    abs_path.write_text(content, encoding="utf-8")
     console.print(f"[green]✓[/green] {action}d: {current_path}")
 
     # Return validation info in result if there were issues
@@ -476,7 +476,7 @@ def tool_edit_file(path: str, old_text: str, new_text: str, auto_confirm: bool =
     if not abs_path.exists():
         return {"success": False, "error": f"File not found: {path}"}
 
-    content = abs_path.read_text()
+    content = abs_path.read_text(encoding="utf-8", errors="replace")
 
     if old_text not in content:
         return {"success": False, "error": f"Text not found in {path}"}
@@ -515,7 +515,7 @@ def tool_edit_file(path: str, old_text: str, new_text: str, auto_confirm: bool =
             return {"success": False, "error": "User cancelled"}
 
     # Write file
-    abs_path.write_text(new_content)
+    abs_path.write_text(new_content, encoding="utf-8")
     console.print(f"[green]✓[/green] Edited: {path}")
 
     # Return validation info if there were issues
