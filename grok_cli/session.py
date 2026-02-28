@@ -149,15 +149,15 @@ def compute_files_hash(cwd: Path | None = None) -> str:
         if any(part.startswith(".") for part in file.parts[len(cwd.parts) :]):
             continue
 
-        # Skip ignored directories
-        if file.parent.name in ignore:
+        # Skip ignored directories (check all path components, not just immediate parent)
+        if any(part in ignore for part in file.relative_to(cwd).parts):
             continue
 
         # Add relative path to hash
         digest.update(str(file.relative_to(cwd)).encode())
 
-        # Optional: include modification time for more sensitivity
-        # digest.update(file.stat().st_mtime_ns.to_bytes(8, 'big'))
+        # Include modification time to detect content changes
+        digest.update(file.stat().st_mtime_ns.to_bytes(8, "big"))
 
     return digest.hexdigest()
 

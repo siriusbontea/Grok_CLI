@@ -205,7 +205,7 @@ def start_repl(cfg: dict[str, Any]) -> None:
             prompt = create_prompt(model=current_model)
 
             # Get user input
-            line = session.prompt(prompt)
+            line = session.prompt(prompt, style=Style.from_dict(PROMPT_STYLE))
             line = line.strip()
 
             # Skip empty input

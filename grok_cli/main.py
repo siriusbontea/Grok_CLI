@@ -157,7 +157,21 @@ def resume(ctx: typer.Context) -> None:
         if session_data:
             # Write session data to context.toon so the REPL picks it up
             context_path = config.get_project_dir() / "context.toon"
-            context_path.write_text(sess.serialize_toon(session_data))
+            # Extract messages from session data (handles both compressed and uncompressed)
+            toon_text = sess.serialize_toon(session_data)
+            messages = sess.toon_to_messages(toon_text)
+            if messages:
+                context_path.write_text(sess.messages_to_toon(messages))
+            else:
+                # Compressed session with history key — inject as system context
+                history = session_data.get("history", "")
+                if history:
+                    history_str = ", ".join(history) if isinstance(history, list) else str(history)
+                    context_path.write_text(
+                        sess.messages_to_toon(
+                            [{"role": "system", "content": f"Previous session summary: {history_str}"}]
+                        )
+                    )
     except Exception as e:
         console.print(f"[bold red]Error:[/bold red] {e}")
         raise typer.Exit(1)

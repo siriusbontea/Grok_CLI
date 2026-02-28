@@ -202,6 +202,26 @@ def create_command(
     console.print(syntax)
     console.print()
 
+    # Validate before writing
+    from grok_cli.validators import validate_file
+
+    validation = validate_file(content, filename)
+    if validation and validation.has_errors:
+        console.print("[red]Validation errors:[/red]")
+        for err in validation.errors:
+            console.print(f"  [red]•[/red] {err}")
+    if validation and validation.warnings:
+        console.print("[yellow]Warnings:[/yellow]")
+        for warn in validation.warnings:
+            console.print(f"  [yellow]•[/yellow] {warn}")
+
+    if validation and validation.has_errors and not auto_yes:
+        from rich.prompt import Confirm
+
+        if not Confirm.ask("Save despite validation errors?", default=False):
+            console.print("[yellow]Cancelled.[/yellow]")
+            raise ValueError(f"Validation failed:\n{validation.format_report()}")
+
     # Write file
     file_abs.write_text(content)
     console.print(f"[green]✓[/green] Created: {filename}")
