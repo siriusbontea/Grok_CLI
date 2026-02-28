@@ -418,7 +418,7 @@ class Agent:
             self.last_response = final_content
 
             # Track budget (estimate since streaming doesn't return usage)
-            estimated_prompt = len(user_message) // 4
+            estimated_prompt = sum(len(str(m.get("content", ""))) for m in messages) // 4
             estimated_completion = len(final_content) // 4
             record_and_warn(model, estimated_prompt, estimated_completion, self.cfg.get("budget_monthly", 0.0))
 
@@ -485,6 +485,9 @@ class Agent:
 
             console.print()  # Final newline
 
+        except (ValueError, KeyError):
+            # Non-retriable errors — don't fall back, just re-raise
+            raise
         except Exception:
             # Fallback to non-streaming if streaming fails
             console.print("[dim](streaming unavailable, using standard response)[/dim]")

@@ -106,6 +106,7 @@ def validate_python(content: str, filename: str = "file.py") -> ValidationResult
                     ["ruff", "check", "--select=E,F", temp_path],
                     capture_output=True,
                     text=True,
+                    timeout=10,
                 )
                 if result.returncode != 0:
                     # Parse ruff output - each line is an issue
@@ -119,6 +120,8 @@ def validate_python(content: str, filename: str = "file.py") -> ValidationResult
                                     errors.append(issue)
                                 else:
                                     warnings.append(issue)
+            except subprocess.TimeoutExpired:
+                warnings.append("ruff timed out")
             except Exception:
                 pass  # ruff check is optional
 
@@ -226,6 +229,7 @@ def validate_latex(content: str, filename: str = "file.tex") -> ValidationResult
                     ["chktex", "-q", "-n1", "-n2", "-n3", temp_path],
                     capture_output=True,
                     text=True,
+                    timeout=10,
                 )
                 # chktex outputs warnings/errors to stdout
                 for line in result.stdout.strip().split("\n"):
@@ -239,6 +243,8 @@ def validate_latex(content: str, filename: str = "file.tex") -> ValidationResult
                     elif line and ":" in line:
                         # Generic issue format
                         warnings.append(line)
+            except subprocess.TimeoutExpired:
+                warnings.append("chktex timed out")
             except Exception:
                 pass
 
@@ -336,12 +342,15 @@ def validate_javascript(content: str, filename: str = "file.js") -> ValidationRe
             ["node", "--check", temp_path],
             capture_output=True,
             text=True,
+            timeout=10,
         )
         if result.returncode != 0:
             # Parse node error output
             for line in result.stderr.strip().split("\n"):
                 if line.strip():
                     errors.append(line.strip())
+    except subprocess.TimeoutExpired:
+        return ValidationResult(valid=True, errors=[], warnings=["node --check timed out"])
     finally:
         Path(temp_path).unlink(missing_ok=True)
 

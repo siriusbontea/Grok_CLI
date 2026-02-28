@@ -294,7 +294,12 @@ def tool_read_file(path: str) -> dict[str, Any]:
     if not abs_path.is_file():
         return {"success": False, "error": f"Not a file: {path}"}
 
-    content = abs_path.read_text()
+    # Reject files over 1 MB to avoid memory/token waste
+    file_size = abs_path.stat().st_size
+    if file_size > 1_048_576:
+        return {"success": False, "error": f"File too large ({file_size / 1_048_576:.1f} MB). Max 1 MB."}
+
+    content = abs_path.read_text(encoding="utf-8", errors="replace")
     console.print(f"[dim]Read {len(content)} bytes from {path}[/dim]")
 
     return {"success": True, "result": content}

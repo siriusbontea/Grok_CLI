@@ -20,6 +20,9 @@ registry = SimpleNamespace(
     model_providers=[],  # list of provider classes
 )
 
+# Track already-loaded plugin stems to avoid re-running register()
+_discovered_plugins: set[str] = set()
+
 
 def register_command(name: str, callback: Callable[..., Any], help_text: str) -> None:
     """Register a new command from a plugin.
@@ -70,6 +73,11 @@ def _load_plugins_from_dir(plugins_dir: Path, loaded_plugins: list[str]) -> None
         if plugin_file.stem in loaded_plugins:
             continue
 
+        # Skip if already discovered in a previous call (prevents re-running register())
+        if plugin_file.stem in _discovered_plugins:
+            loaded_plugins.append(plugin_file.stem)
+            continue
+
         try:
             module_name = f"grok_plugin_{plugin_file.stem}"
             spec = importlib.util.spec_from_file_location(module_name, plugin_file)
@@ -84,6 +92,7 @@ def _load_plugins_from_dir(plugins_dir: Path, loaded_plugins: list[str]) -> None
             if hasattr(module, "register"):
                 module.register()
                 loaded_plugins.append(plugin_file.stem)
+                _discovered_plugins.add(plugin_file.stem)
 
         except Exception as e:
             from rich.console import Console
