@@ -205,6 +205,28 @@ def save_config(config: dict[str, Any]) -> None:
     config_path.write_text(tomlkit.dumps(doc))
 
 
+def update_config_value(key: str, value: Any) -> None:
+    """Update a single key in config.toml without overwriting other values.
+
+    Unlike save_config(cfg), this only touches the specified key,
+    preventing runtime-only overrides (like -y flag) from leaking
+    into the persisted config.
+
+    Args:
+        key: Configuration key to update
+        value: New value for the key
+    """
+    config_path = get_config_path()
+
+    if config_path.exists():
+        doc = tomlkit.parse(config_path.read_text())
+    else:
+        doc = document()
+
+    doc[key] = value
+    config_path.write_text(tomlkit.dumps(doc))
+
+
 def get_api_key() -> str | None:
     """Get Grok API key from environment.
 

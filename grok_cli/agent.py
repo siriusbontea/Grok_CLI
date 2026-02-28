@@ -195,8 +195,9 @@ class Agent:
             compressed = session.compress_session(data, compress_mode)
             toon_content = session.serialize_toon(compressed)
         except RuntimeError:
-            # Context too large even after compression — fall back to uncompressed
-            toon_content = session.messages_to_toon(self.messages)
+            # Context too large even after compression — keep only last 6 messages
+            truncated = self.messages[-6:] if len(self.messages) > 6 else self.messages
+            toon_content = session.messages_to_toon(truncated)
 
         context_path.write_text(toon_content)
 

@@ -17,7 +17,7 @@ from typing import Any, Iterator
 
 from prompt_toolkit import PromptSession
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
-from prompt_toolkit.completion import Completer, Completion, PathCompleter
+from prompt_toolkit.completion import Completer, Completion
 from prompt_toolkit.document import Document
 from prompt_toolkit.history import FileHistory
 from prompt_toolkit.key_binding import KeyBindings
@@ -71,9 +71,6 @@ class GrokCompleter(Completer):
 
         # Commands that expect file/directory arguments
         self.file_commands = {"cat", "head", "tail", "cp", "mv", "rm", "cd", "ls", "ll", "tree", "mkdir"}
-
-        # Path completer for file arguments
-        self.path_completer = PathCompleter(expanduser=True)
 
     def get_completions(self, document: Document, complete_event: Any) -> Iterator[Completion]:
         """Get completions for current input.
@@ -241,7 +238,7 @@ def start_repl(cfg: dict[str, Any]) -> None:
             first_word = words[0] if words else ""
             if is_shell_command(first_word):
                 try:
-                    execute_shell_command(line.split())
+                    execute_shell_command(words)
                 except Exception as e:
                     console.print(f"[red]Error:[/red] {e}")
                 continue

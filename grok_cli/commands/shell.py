@@ -87,20 +87,20 @@ def cmd_ls(args: list[str]) -> None:
             stat = item.stat()
             size = stat.st_size
             name = item.name
-            if item.is_dir():
-                name = f"[blue]{name}/[/blue]"
-            elif item.is_symlink():
+            if item.is_symlink():
                 name = f"[cyan]{name}@[/cyan]"
+            elif item.is_dir():
+                name = f"[blue]{name}/[/blue]"
             table.add_row(f"{size:>10}", name)
         console.print(table)
     else:
         # Simple format
         for item in items:
             name = item.name
-            if item.is_dir():
-                console.print(f"[blue]{name}/[/blue]", end="  ")
-            elif item.is_symlink():
+            if item.is_symlink():
                 console.print(f"[cyan]{name}@[/cyan]", end="  ")
+            elif item.is_dir():
+                console.print(f"[blue]{name}/[/blue]", end="  ")
             else:
                 console.print(name, end="  ")
         console.print()  # Newline at end

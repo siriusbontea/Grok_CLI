@@ -297,7 +297,7 @@ def cmd_model(args: list[str], cfg: dict[str, Any], agent: Any) -> None:
         return
 
     cfg["default_model"] = model_name
-    config.save_config(cfg)
+    config.update_config_value("default_model", model_name)
 
     friendly = get_friendly_name(api_model)
     console.print(f"[green]✓[/green] Model set to: {friendly} ({api_model})")
@@ -646,7 +646,7 @@ def cmd_theme(args: list[str], cfg: dict[str, Any], agent: Any) -> None:
 
     # Update config
     cfg["theme"] = theme_name
-    config.save_config(cfg)
+    config.update_config_value("theme", theme_name)
 
     # Update the prompt style
     from grok_cli.ui import prompt
