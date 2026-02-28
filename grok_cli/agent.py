@@ -272,6 +272,8 @@ class Agent:
         max_iterations = 10  # Prevent infinite loops
         iteration = 0
         start_time = time.time()
+        tools_used_this_exchange: list[str] = []
+        msg_index_before = len(self.messages)  # For rollback on exception
 
         while iteration < max_iterations:
             iteration += 1
@@ -288,9 +290,8 @@ class Agent:
                         max_tokens=8192,
                     )
             except Exception:
-                # Remove orphaned user message so history stays paired
-                if self.messages and self.messages[-1].get("role") == "user":
-                    self.messages.pop()
+                # Roll back all messages added during this exchange
+                del self.messages[msg_index_before:]
                 raise
 
             # Track budget for non-streaming call
@@ -369,6 +370,7 @@ class Agent:
                     # Mark task as in progress
                     self.task_tracker.start_task(task_id)
                     console.print(f"\n[cyan]Using tool:[/cyan] {tool_name}")
+                    tools_used_this_exchange.append(tool_name)
 
                     # Execute the tool
                     result = execute_tool(tool_name, arguments, self.auto_confirm)
@@ -411,8 +413,12 @@ class Agent:
             # Track elapsed time
             self.last_elapsed = time.time() - start_time
 
-            # Add to conversation history
-            self.messages.append({"role": "assistant", "content": final_content})
+            # Add to conversation history (include tool notes for context persistence)
+            if tools_used_this_exchange:
+                tool_prefix = "[Tools: " + ", ".join(tools_used_this_exchange) + "]\n\n"
+            else:
+                tool_prefix = ""
+            self.messages.append({"role": "assistant", "content": tool_prefix + final_content})
 
             # Store for /copy command
             self.last_response = final_content

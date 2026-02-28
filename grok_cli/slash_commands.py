@@ -556,16 +556,17 @@ def cmd_resume(args: list[str], cfg: dict[str, Any], agent: Any) -> None:
         return
 
     if args:
-        # Check if arg is a number (index)
+        # Check if arg is a number (index) — use try/except to avoid
+        # isdigit() accepting Unicode digits (², ³) that int() rejects
         name = args[0]
-        if name.isdigit():
+        try:
             idx = int(name) - 1
             if 0 <= idx < len(session_files):
                 filepath = session_files[idx]
             else:
                 console.print(f"[red]Invalid session number:[/red] {name}")
                 return
-        else:
+        except ValueError:
             # Sanitize: strip path separators to prevent traversal
             name = Path(name).name
             if not name.endswith(".toon"):

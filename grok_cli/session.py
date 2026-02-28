@@ -19,6 +19,10 @@ from pathlib import Path
 from typing import Any
 
 
+# Keys that use comma-separated list format in TOON
+_LIST_KEYS = {"history", "decisions"}
+
+
 def parse_toon(text: str) -> dict[str, str | list[str]]:
     """Parse TOON format text into a dictionary.
 
@@ -54,9 +58,10 @@ def parse_toon(text: str) -> dict[str, str | list[str]]:
             value += "\n" + continuation
             i += 1
 
-        # Detect list: only when commas have no trailing space (serialize uses ",")
-        # This avoids corrupting code like "f(a, b, c)" or "import os, sys"
-        if "," in value and "\n" not in value and ", " not in value:
+        # Detect list: only for known list-type keys (history, decisions).
+        # Content keys (turn_NNN_*) are never lists — their values can contain
+        # arbitrary text including commas that would be corrupted by splitting.
+        if key in _LIST_KEYS and "," in value and "\n" not in value:
             data[key] = [v.strip() for v in value.split(",") if v.strip()]
         else:
             data[key] = value
@@ -89,16 +94,9 @@ def serialize_toon(data: dict[str, str | list[str] | None]) -> str:
         else:
             value_str = str(value)
 
-        # Split long values into indented continuation lines (>120 chars or contains newlines)
-        if len(value_str) > 120 or "\n" in value_str:
-            # If no newlines but too long, split at 120-char boundaries
-            if "\n" not in value_str and len(value_str) > 120:
-                parts = []
-                for i in range(0, len(value_str), 120):
-                    parts.append(value_str[i : i + 120])
-            else:
-                parts = value_str.split("\n")  # Split on actual newlines
-
+        # Split multi-line values into indented continuation lines
+        if "\n" in value_str:
+            parts = value_str.split("\n")
             lines.append(f"{key}: {parts[0]}")
             for part in parts[1:]:
                 lines.append(f"  {part}")

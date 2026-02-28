@@ -477,8 +477,8 @@ def cmd_rm(args: list[str]) -> None:
     Args:
         args: Command arguments (-r for recursive, paths)
     """
-    # Parse arguments
-    recursive = "-r" in args or "-rf" in args
+    # Parse arguments — match any flag containing 'r' (e.g. -r, -rf, -fr)
+    recursive = any("r" in arg[1:] for arg in args if arg.startswith("-"))
     paths = [arg for arg in args if not arg.startswith("-")]
 
     if not paths:

@@ -49,13 +49,16 @@ def test_serialize_list():
 
 
 def test_serialize_long_value():
-    """Test serializing long values (indented continuation)."""
-    data = {"description": "a" * 150}  # > 120 chars
+    """Test that long single-line values are preserved without splitting."""
+    long_value = "a" * 150  # > 120 chars
+    data = {"description": long_value}
     result = serialize_toon(data)
     lines = result.strip().split("\n")
-    assert len(lines) > 1  # Should be split into multiple lines
-    assert lines[0].startswith("description:")
-    assert lines[1].startswith("  ")  # Continuation line should be indented
+    assert len(lines) == 1  # Long values stay on a single line (no artificial splitting)
+    assert lines[0] == f"description: {long_value}"
+    # Round-trip preserves the value
+    parsed = parse_toon(result)
+    assert parsed["description"] == long_value
 
 
 def test_round_trip():
