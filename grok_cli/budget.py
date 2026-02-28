@@ -55,7 +55,7 @@ class BudgetTracker:
             return self._empty_data()
 
         try:
-            data = json.loads(self._path.read_text())
+            data = json.loads(self._path.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             return self._empty_data()
 
@@ -68,7 +68,7 @@ class BudgetTracker:
     def _save(self) -> None:
         """Persist usage data to disk."""
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        self._path.write_text(json.dumps(self._data, indent=2) + "\n")
+        self._path.write_text(json.dumps(self._data, indent=2) + "\n", encoding="utf-8")
 
     def record_usage(self, model: str, prompt_tokens: int, completion_tokens: int) -> None:
         """Record token usage and calculate cost.

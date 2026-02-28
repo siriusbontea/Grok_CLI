@@ -286,7 +286,7 @@ def save_session(data: dict[str, Any], compress_mode: str = "smart") -> Path:
     session_file = sessions_dir / f"{timestamp}.toon"
 
     # Save to file
-    session_file.write_text(serialize_toon(compressed_data))
+    session_file.write_text(serialize_toon(compressed_data), encoding="utf-8")
 
     # Update current symlink
     current_link = sessions_dir / "current"
@@ -325,7 +325,7 @@ def load_session(session_path: Path | None = None) -> dict[str, Any]:
         raise FileNotFoundError(f"Session file not found: {session_path}")
 
     # Load and parse TOON
-    toon_text = session_path.read_text()
+    toon_text = session_path.read_text(encoding="utf-8")
     return parse_toon(toon_text)
 
 

@@ -180,7 +180,7 @@ def resume(
                 toon_text = sess.serialize_toon(session_data)
                 messages = sess.toon_to_messages(toon_text)
                 if messages:
-                    context_path.write_text(sess.messages_to_toon(messages))
+                    context_path.write_text(sess.messages_to_toon(messages), encoding="utf-8")
                 else:
                     # Compressed session with history key — inject as user context note
                     # Use "user" role, not "system", because mid-conversation system
@@ -191,7 +191,8 @@ def resume(
                         context_path.write_text(
                             sess.messages_to_toon(
                                 [{"role": "user", "content": f"[Previous session context] {history_str}"}]
-                            )
+                            ),
+                            encoding="utf-8",
                         )
         except Exception as e:
             console.print(f"[bold red]Error:[/bold red] {e}")

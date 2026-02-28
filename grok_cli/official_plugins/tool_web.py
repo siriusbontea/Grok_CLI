@@ -46,7 +46,7 @@ def _load_quota() -> dict[str, Any]:
 
     if path.exists():
         try:
-            data = json.loads(path.read_text())
+            data = json.loads(path.read_text(encoding="utf-8"))
             if data.get("date") == today:
                 return data
         except (json.JSONDecodeError, KeyError):
@@ -62,7 +62,7 @@ def _save_quota(data: dict[str, Any]) -> None:
     Args:
         data: Quota dict with "date" and "tokens_used" keys.
     """
-    _quota_path().write_text(json.dumps(data))
+    _quota_path().write_text(json.dumps(data), encoding="utf-8")
 
 
 def _check_quota(tokens_needed: int) -> bool:

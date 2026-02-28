@@ -196,7 +196,7 @@ def cmd_cat(args: list[str]) -> None:
                 console.print(f"[red]Error:[/red] {file_path} is not a file")
                 continue
 
-            content = target_abs.read_text()
+            content = target_abs.read_text(encoding="utf-8", errors="replace")
             console.print(content, end="")
 
         except PermissionError as e:
@@ -245,7 +245,7 @@ def cmd_head(args: list[str]) -> None:
                 console.print(f"[red]Error:[/red] {file_path} is not a file")
                 continue
 
-            lines = target_abs.read_text().splitlines()
+            lines = target_abs.read_text(encoding="utf-8", errors="replace").splitlines()
             for line in lines[:num_lines]:
                 console.print(line)
 
@@ -295,7 +295,7 @@ def cmd_tail(args: list[str]) -> None:
                 console.print(f"[red]Error:[/red] {file_path} is not a file")
                 continue
 
-            lines = target_abs.read_text().splitlines()
+            lines = target_abs.read_text(encoding="utf-8", errors="replace").splitlines()
             for line in lines[-num_lines:]:
                 console.print(line)
 

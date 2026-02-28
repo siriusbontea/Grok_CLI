@@ -135,23 +135,3 @@ class GrokProvider(Provider):
         # Should never reach here, but just in case
         raise RuntimeError("Unknown error occurred in API call")
 
-    def list_models(self) -> list[str]:
-        """List available models from Grok API.
-
-        Returns:
-            List of model identifiers
-        """
-        try:
-            models = self.client.models.list()
-            return [model.id for model in models.data]
-        except Exception:
-            # If API call fails, return known models
-            return [
-                "grok-4-1-fast-non-reasoning",
-                "grok-4-1-fast-reasoning",
-                "grok-4-fast-reasoning",
-                "grok-4-fast-non-reasoning",
-                "grok-code-fast-1",
-                "grok-4",
-                "grok-2-image-1212",
-            ]

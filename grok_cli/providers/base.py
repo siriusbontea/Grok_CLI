@@ -31,15 +31,6 @@ class Provider(ABC):
         """
         pass
 
-    @abstractmethod
-    def list_models(self) -> list[str]:
-        """List available models from this provider.
-
-        Returns:
-            List of model identifiers
-        """
-        pass
-
     @property
     @abstractmethod
     def name(self) -> str:

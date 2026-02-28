@@ -150,7 +150,7 @@ def create_default_config() -> None:
     doc["web_daily_quota"] = DEFAULT_CONFIG["web_daily_quota"]
 
     # Write to file
-    config_path.write_text(tomlkit.dumps(doc))
+    config_path.write_text(tomlkit.dumps(doc), encoding="utf-8")
 
 
 def load_config() -> dict[str, Any]:
@@ -168,7 +168,7 @@ def load_config() -> dict[str, Any]:
         create_default_config()
 
     # Load and parse TOML
-    config_text = config_path.read_text()
+    config_text = config_path.read_text(encoding="utf-8")
     config = tomlkit.parse(config_text)
 
     # Convert to regular dict and merge with defaults (for any missing keys)
@@ -195,12 +195,12 @@ def update_config_value(key: str, value: Any) -> None:
     config_path = get_config_path()
 
     if config_path.exists():
-        doc = tomlkit.parse(config_path.read_text())
+        doc = tomlkit.parse(config_path.read_text(encoding="utf-8"))
     else:
         doc = document()
 
     doc[key] = value
-    config_path.write_text(tomlkit.dumps(doc))
+    config_path.write_text(tomlkit.dumps(doc), encoding="utf-8")
 
 
 def get_api_key() -> str | None:

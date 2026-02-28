@@ -199,7 +199,7 @@ class Agent:
             truncated = self.messages[-6:] if len(self.messages) > 6 else self.messages
             toon_content = session.messages_to_toon(truncated)
 
-        context_path.write_text(toon_content)
+        context_path.write_text(toon_content, encoding="utf-8")
 
     def load_context(self) -> bool:
         """Load conversation from context.toon if it exists.
@@ -213,7 +213,7 @@ class Agent:
             return False
 
         try:
-            toon_content = context_path.read_text()
+            toon_content = context_path.read_text(encoding="utf-8")
             self.messages = session.toon_to_messages(toon_content)
             # Estimate tokens from loaded messages
             self.total_tokens = sum(len(m.get("content", "")) // 4 for m in self.messages)

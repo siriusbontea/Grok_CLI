@@ -530,7 +530,7 @@ def cmd_save(args: list[str], cfg: dict[str, Any], agent: Any) -> None:
     toon_content = session.messages_to_toon(agent.messages)
 
     # Save file
-    filepath.write_text(toon_content)
+    filepath.write_text(toon_content, encoding="utf-8")
 
     # Show transparent output
     console.print(f"\n[green]✓[/green] Session saved ({len(agent.messages)} messages)")
@@ -602,7 +602,7 @@ def cmd_resume(args: list[str], cfg: dict[str, Any], agent: Any) -> None:
 
     # Load the session
     try:
-        toon_content = filepath.read_text()
+        toon_content = filepath.read_text(encoding="utf-8")
         messages = session.toon_to_messages(toon_content)
 
         # If no turn_ keys found (compressed session), reconstruct from history

@@ -223,7 +223,7 @@ def create_command(
             raise ValueError(f"Validation failed:\n{validation.format_report()}")
 
     # Write file
-    file_abs.write_text(content)
+    file_abs.write_text(content, encoding="utf-8")
     console.print(f"[green]✓[/green] Created: {filename}")
 
     return file_abs

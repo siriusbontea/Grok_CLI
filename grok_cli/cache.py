@@ -70,7 +70,7 @@ def get_cached_response(messages: list[dict[str, str]], model: str, temperature:
         return None
 
     try:
-        cached_data = json.loads(cache_file.read_text())
+        cached_data = json.loads(cache_file.read_text(encoding="utf-8"))
 
         # Check if cache is still valid (not older than 30 days)
         cached_at_str = cached_data.get("cached_at", "")
@@ -116,7 +116,7 @@ def cache_response(messages: list[dict[str, str]], model: str, temperature: floa
         "response": response,
     }
 
-    cache_file.write_text(json.dumps(cache_data, indent=2))
+    cache_file.write_text(json.dumps(cache_data, indent=2), encoding="utf-8")
 
     # Prune cache if needed (async, don't block)
     try:

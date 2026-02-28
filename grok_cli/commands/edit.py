@@ -88,7 +88,7 @@ def edit_command(filename: str, instruction: str, cfg: dict[str, Any], auto_yes:
         raise FileNotFoundError(f"File not found: {filename}")
 
     # Read original content
-    original_content = file_abs.read_text()
+    original_content = file_abs.read_text(encoding="utf-8", errors="replace")
 
     # Detect file type from extension
     file_type = file_abs.suffix.lstrip(".") or "txt"
@@ -171,7 +171,7 @@ def edit_command(filename: str, instruction: str, cfg: dict[str, Any], auto_yes:
             raise RuntimeError("Edit cancelled by user")
 
     # Write modified content
-    file_abs.write_text(modified_content)
+    file_abs.write_text(modified_content, encoding="utf-8")
     console.print(f"[green]✓[/green] Updated: {filename}")
 
     return file_abs
