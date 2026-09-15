@@ -2,7 +2,6 @@
 ## _**The original intent of this project was to create a coding terminal user interface (TUI) with features and functionality similar to Anthropic's Claude Code, but tuned for SpaceXAI's Grok models.  This was built long before the release of Grok Build and Grok Bot, which are both far superior to this TUI.**_
 ## _**I personally use Grok Build, Grok Bot, and Cursor on a daily basis and I highly recommend those tools for any serious engineering work.**_
 
-<hr>
 # Grok CLI
 ### 22 November 2025
 
